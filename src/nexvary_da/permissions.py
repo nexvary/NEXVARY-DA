@@ -11,7 +11,10 @@ from .errors import PermissionDenied, WorkspaceViolation
 class Permission(StrEnum):
     READ = "read"
     WRITE = "write"
+    DELETE = "delete"
     SHELL = "shell"
+    NETWORK = "network"
+    GIT_COMMIT = "git_commit"
     GIT_PUSH = "git_push"
     RELEASE = "release"
     ADB = "adb"
@@ -96,3 +99,10 @@ class WorkspaceGuard:
                 f'Permission "{permission.value}" is not granted for workspace "{policy.name}"'
             )
         return target
+
+    def has(self, path: str | os.PathLike[str], permission: Permission) -> bool:
+        try:
+            policy = self.policy_for(path, must_exist=True)
+        except WorkspaceViolation:
+            return False
+        return permission in policy.permissions

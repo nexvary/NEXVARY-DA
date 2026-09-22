@@ -1,46 +1,45 @@
 # Work Project State
 
-This file is the human-readable handover. Runtime state is stored locally in `.nexvary-da/state.sqlite3`.
+Runtime operational state lives locally in `.nexvary-da/state.sqlite3`. GitHub remains the code-history source of truth.
 
 ## Repository
 
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current target: v0.1 Core
+- Current target: hybrid v0.1 Core
 
-## Implemented on the development branch
+## Verified baseline before hybrid expansion
 
-- Workspace Guard with independent read/write/shell/git-push/release/ADB/desktop-automation capabilities.
-- Persistent SQLite project state and reusable Agent Pool slots.
-- Persistent terminal with cross-command cwd/environment continuity on Windows and Linux.
-- File, exact-patch, search, process and Git tools.
-- Environment discovery for Windows/Linux, Android SDK, Java/JDK, Gradle, ADB, Python, CMake, Node/npm and Git.
-- Executable Builder and QA adapters.
-- Transport-independent Tool Kernel.
-- Persistent Definition-of-Done Goal Engine.
-- Project-bound local MCP server using the official MCP Python SDK; MCP cannot switch to an unapproved workspace.
-- Evidence-based Release Gate v0.1.
-- Minimal real desktop UI backed by the same core.
-- Windows and Ubuntu CI with real MCP integration tests.
+Run #13 on commit `0c6b4c73bb43d592424d65a00823706dcc3dc59e` passed on Ubuntu 24.04 and Windows. It covered compile, unit/integration tests, CLI smoke test, source distribution and wheel creation, distribution validation and artifact upload.
 
-## Validation evidence
+## Hybrid architecture now incorporated in source
 
-Run #12 on commit `d542ec68d02225ac455b3b352b7a047231d17360` passed on both Ubuntu 24.04 and Windows. It covered package install, compile, nine unit/integration tests, persistent terminal behavior, in-process MCP tool calls, and `git diff --check`.
+- Cloud Intelligence boundary with explicit network permission.
+- Local execution remains authoritative for files, shell, Git, build and tests.
+- Fast, Engineer and strict Release modes.
+- Independent delete/network/git-commit permissions.
+- Git push requires both git-push and network.
+- Per-Agent persistent Terminal Pool.
+- Add Project from GitHub backend with matching-clone reuse.
+- Local project catalog under the selected Projects Root.
+- Change discovery from local Git for scoped validation.
+- Strict Release Gate fails closed on missing heavy QA evidence.
+- Artifact discovery and SHA-256 release evidence.
+- Minimal UI controls for work mode and Add Project from GitHub.
 
-The next CI revision additionally builds and validates wheel/source distributions and uploads them as workflow artifacts.
+## Still incomplete
 
-## Explicitly not complete
+- Concrete cloud-provider adapter and credential configuration.
+- Autonomous cloud-plan -> approved local tool-call loop.
+- Validation cache and file watcher.
+- Targeted test selection beyond current Builder/QA project adapters.
+- GitHub PR/Actions/Release API integration inside the local app.
+- Android UI/device QA and ADB lab adapters.
+- UI/RTL/localization/broken-button/navigation/dead-link/orphan-page heavy adapters.
+- Node/CMake project profiles.
+- Signed Windows/Linux installers.
 
-- Coordinator task-graph execution beyond durable worker slots.
-- GitHub PR/Actions/artifact integration inside the local application.
-- External model-provider orchestration.
-- Process registry with attach/cancel/output retention.
-- Android UI/device QA and ADB lab workflows.
-- Generic dead-link, orphan-page, broken-button, navigation, RTL and localization adapters.
-- Node/CMake project profiles beyond environment detection.
-- Signed desktop installers and release publication.
+## Completion rule
 
-## v0.1 completion rule
-
-Do not label v0.1 production-ready until the remaining v0.1 scope has evidence-producing adapters and the final Windows/Ubuntu Release Gate passes. Missing checks remain explicit rather than being reported as PASS.
+No code path may claim strict Release READY while required evidence is missing. The hybrid batch must pass Windows and Ubuntu CI before it is treated as the new verified baseline.

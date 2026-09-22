@@ -5,16 +5,22 @@ import json
 from dataclasses import asdict
 
 from .agents import AgentRole, BuilderAgent, QAAgent
+from .coordinator import DevelopmentCoordinator
 from .environment import discover_environment
 from .mcp_server import run_mcp
+from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime, init_project
+from .project_import import ProjectImporter
 from .ui import launch_ui
 
 
 def _permission_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--allow-write", action="store_true")
+    parser.add_argument("--allow-delete", action="store_true")
     parser.add_argument("--allow-shell", action="store_true")
+    parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--allow-git-commit", action="store_true")
     parser.add_argument("--allow-git-push", action="store_true")
     parser.add_argument("--allow-release", action="store_true")
     parser.add_argument("--allow-adb", action="store_true")
@@ -25,7 +31,10 @@ def _grants(args: argparse.Namespace) -> set[Permission]:
     granted = {Permission.READ}
     mapping = {
         "allow_write": Permission.WRITE,
+        "allow_delete": Permission.DELETE,
         "allow_shell": Permission.SHELL,
+        "allow_network": Permission.NETWORK,
+        "allow_git_commit": Permission.GIT_COMMIT,
         "allow_git_push": Permission.GIT_PUSH,
         "allow_release": Permission.RELEASE,
         "allow_adb": Permission.ADB,
@@ -47,12 +56,25 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--repo")
     _permission_flags(init)
 
+    add = sub.add_parser("add-github", help="Clone/reuse and register a GitHub project")
+    add.add_argument("projects_root")
+    add.add_argument("url")
+    _permission_flags(add)
+
+    verify = sub.add_parser("verify", help="Run Fast, Engineer, or Release local verification")
+    verify.add_argument("path", nargs="?", default=".")
+    verify.add_argument(
+        "--mode",
+        choices=[mode.value for mode in WorkMode],
+        default=WorkMode.ENGINEER.value,
+    )
+
     for name, help_text in (
         ("status", "Show durable project state"),
         ("discover", "Discover local build tools"),
         ("build", "Run the Builder agent adapter"),
         ("qa", "Run the QA agent adapter"),
-        ("gate", "Run the release gate"),
+        ("gate", "Run the strict release gate"),
         ("shell", "Open the persistent shell loop"),
         ("ui", "Launch the minimal desktop UI"),
         ("mcp", "Serve the approved project over local MCP stdio"),
@@ -76,6 +98,23 @@ def main(argv: list[str] | None = None) -> int:
         print(path)
         return 0
 
+    if args.command == "add-github":
+        importer = ProjectImporter(
+            args.projects_root,
+            {
+                Permission.READ,
+                Permission.WRITE,
+                Permission.SHELL,
+                Permission.NETWORK,
+            },
+        )
+        imported = importer.add_from_github(
+            args.url,
+            project_permissions=_grants(args),
+        )
+        print(json.dumps(asdict(imported), indent=2, ensure_ascii=False))
+        return 0
+
     if args.command == "discover":
         print(json.dumps(discover_environment(), indent=2, ensure_ascii=False))
         return 0
@@ -94,9 +133,11 @@ def main(argv: list[str] | None = None) -> int:
             if Permission.SHELL in runtime.config.permissions:
                 branch = runtime.git.branch()
                 commit = runtime.git.commit()
+                changed_files = runtime.git.changed_files()
                 git_status = "available"
             else:
                 branch = commit = None
+                changed_files = []
                 git_status = "shell permission not granted"
             result = {
                 "project": runtime.config.name,
@@ -104,50 +145,80 @@ def main(argv: list[str] | None = None) -> int:
                 "root": str(runtime.root),
                 "branch": branch,
                 "commit": commit,
+                "changed_files": changed_files,
                 "git_status": git_status,
                 "permissions": sorted(p.value for p in runtime.config.permissions),
                 "tasks": [asdict(task) for task in runtime.state.list_tasks()],
-                "agents": [asdict(worker) | {"role": worker.role.value} for worker in runtime.agents.snapshot()],
+                "agents": [
+                    asdict(worker) | {"role": worker.role.value}
+                    for worker in runtime.agents.snapshot()
+                ],
+                "last_validation_gate": runtime.state.get_meta("last_validation_gate"),
                 "last_release_gate": runtime.state.get_meta("last_release_gate"),
+                "last_coordinator_run": runtime.state.get_meta("last_coordinator_run"),
             }
             print(json.dumps(result, indent=2, ensure_ascii=False))
             return 0
 
+        if args.command == "verify":
+            report = DevelopmentCoordinator(runtime).run(WorkMode(args.mode))
+            print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+            return 0 if report.complete else 2
+
         if args.command == "build":
             runtime.agents.acquire(AgentRole.BUILDER, "build")
             execution = BuilderAgent(runtime.runner, runtime.root).run()
-            runtime.agents.finish(AgentRole.BUILDER, success=execution.supported and execution.success)
-            print(json.dumps({
-                "supported": execution.supported,
-                "success": execution.success,
-                "label": execution.label,
-                "reason": execution.reason,
-                "output": execution.result.stdout if execution.result else "",
-            }, indent=2, ensure_ascii=False))
+            runtime.agents.finish(
+                AgentRole.BUILDER,
+                success=execution.supported and execution.success,
+            )
+            print(
+                json.dumps(
+                    {
+                        "supported": execution.supported,
+                        "success": execution.success,
+                        "label": execution.label,
+                        "reason": execution.reason,
+                        "output": execution.result.stdout if execution.result else "",
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
             return 0 if execution.supported and execution.success else 2
 
         if args.command == "qa":
             runtime.agents.acquire(AgentRole.QA, "qa")
             execution = QAAgent(runtime.runner, runtime.root).run()
-            runtime.agents.finish(AgentRole.QA, success=execution.supported and execution.success)
-            print(json.dumps({
-                "supported": execution.supported,
-                "success": execution.success,
-                "label": execution.label,
-                "reason": execution.reason,
-                "output": execution.result.stdout if execution.result else "",
-            }, indent=2, ensure_ascii=False))
+            runtime.agents.finish(
+                AgentRole.QA,
+                success=execution.supported and execution.success,
+            )
+            print(
+                json.dumps(
+                    {
+                        "supported": execution.supported,
+                        "success": execution.success,
+                        "label": execution.label,
+                        "reason": execution.reason,
+                        "output": execution.result.stdout if execution.result else "",
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
             return 0 if execution.supported and execution.success else 2
 
         if args.command == "gate":
+            runtime.guard.require(runtime.root, Permission.RELEASE, must_exist=True)
             runtime.agents.acquire(AgentRole.RELEASE, "release-gate")
-            report = runtime.release_gate().run()
+            report = runtime.release_gate().run(strict=True)
             runtime.agents.finish(AgentRole.RELEASE, success=report.ready)
             print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
             return 0 if report.ready else 2
 
         if args.command == "shell":
-            with runtime.terminal() as terminal:
+            with runtime.terminal_for("interactive") as terminal:
                 while True:
                     try:
                         command = input("nexvary-da> ")

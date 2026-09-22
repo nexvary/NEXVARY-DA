@@ -1,26 +1,27 @@
 # NEXVARY Developer Agent (NEXVARY-DA)
 
-NEXVARY-DA is a local, permission-gated developer-agent runtime for approved software workspaces. It is designed around persistent project state, real terminal continuity, verifiable Definition-of-Done gates, and project-bound MCP tools.
+NEXVARY-DA is a hybrid developer-agent runtime: **cloud intelligence for fast reasoning, secure local execution for real development work**.
 
-> **Status:** v0.1 Core under engineering. It is not labelled production-ready until the remaining v0.1 scope and final Release Gate are verified.
+A large local LLM is not required. Files, persistent terminals, Git, builds, tests and device/toolchain operations stay local inside approved workspaces.
 
-## Working v0.1 surfaces
+> **Status:** v0.1 Core under engineering. It is not production-ready; strict Release Mode deliberately blocks READY while required heavy adapters are missing.
 
+## Current engine
+
+- Cloud-reasoning provider boundary with explicit network permission.
+- Fast / Engineer / Release work modes.
 - Approved workspace roots with independent permissions.
-- Atomic file writes, exact patching and bounded text search.
-- Persistent Windows/POSIX terminal sessions whose cwd and environment survive commands.
-- Process and Git helpers.
-- SQLite project state.
-- Reusable Agent Pool slots plus executable Builder and QA adapters.
-- Durable Goal Engine requiring explicit evidence for required completion conditions.
-- Project-bound local MCP server using the same permission-gated runtime.
+- Read/write/delete file controls.
+- Persistent per-Agent terminal sessions.
+- Local Git status/diff/commit/push controls.
+- SQLite project state and reusable workers.
+- Builder/QA coordination and Definition of Done.
+- Project-bound MCP tools.
+- Add Project from GitHub with local clone reuse.
 - Environment discovery for Git, Java/JDK, Gradle, ADB, CMake, Node/npm and Python.
-- Release Gate with Python and Gradle/Android adapters.
-- High-confidence local secrets scan.
-- Minimal desktop UI using the same real core.
-- Windows and Ubuntu CI with MCP integration tests and package artifacts.
-
-Unsupported generic checks are shown as `SKIP` or `NOT_CONFIGURED`; they are never presented as successful.
+- Strict Release Gate with secrets, artifact and SHA-256 evidence.
+- Minimal desktop UI using the real engine.
+- Windows and Ubuntu CI with package artifacts.
 
 ## Local bootstrap
 
@@ -28,26 +29,23 @@ Requires Python 3.12+.
 
 ```bash
 python -m pip install -e .
+
 nexvary-da init /path/to/project --repo owner/repo --allow-write --allow-shell
+
+nexvary-da verify /path/to/project --mode fast
+nexvary-da verify /path/to/project --mode engineer
+nexvary-da verify /path/to/project --mode release
+
+nexvary-da add-github /path/to/Projects https://github.com/owner/repo \
+  --allow-write --allow-shell
+
 nexvary-da status /path/to/project
 nexvary-da discover /path/to/project
-nexvary-da build /path/to/project
-nexvary-da qa /path/to/project
-nexvary-da gate /path/to/project
 nexvary-da shell /path/to/project
 nexvary-da ui /path/to/project
 nexvary-da mcp /path/to/project
 ```
 
-Higher-risk permissions are opt-in: `--allow-git-push`, `--allow-release`, `--allow-adb`, and `--allow-desktop-automation`.
+Sensitive project permissions are explicit: `--allow-delete`, `--allow-network`, `--allow-git-commit`, `--allow-git-push`, `--allow-release`, `--allow-adb`, and `--allow-desktop-automation`.
 
-Runtime configuration/state is written under `.nexvary-da/` and ignored by Git.
-
-## Engineering state
-
-- `ARCHITECTURE.md`
-- `SECURITY_MODEL.md`
-- `RELEASE_GATE.md`
-- `ROADMAP.md`
-- `WORK_PROJECT_STATE.md`
-- `THIRD_PARTY_NOTICES.md`
+See `HYBRID_ARCHITECTURE.md`, `ARCHITECTURE.md`, `SECURITY_MODEL.md`, `RELEASE_GATE.md`, `ROADMAP.md`, and `WORK_PROJECT_STATE.md`.

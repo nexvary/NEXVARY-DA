@@ -1,22 +1,44 @@
 # NEXVARY-DA Roadmap
 
-## v0.1 Core — implemented and being hardened
+## v0.1 Core — implemented / being hardened
 
-Approved workspaces and capabilities; SQLite state; persistent terminal; file/process/Git tools; environment discovery; reusable agent slots; executable Builder/QA adapters; Tool Kernel; durable Goal/Definition-of-Done engine; project-bound local MCP transport; Release Gate; Python/Gradle support; minimal desktop UI; Windows/Ubuntu CI; Python package artifacts.
+- Approved workspace roots and independent capabilities.
+- Read/write/delete/shell/network/git-commit/git-push/release/ADB/desktop-control permission model.
+- SQLite state and reusable Agent Pool.
+- Persistent per-Agent terminal pool.
+- File/process/Git tools.
+- Environment discovery.
+- Builder and QA adapters.
+- Goal / Definition-of-Done engine.
+- Fast, Engineer and strict Release modes.
+- Project-bound MCP server.
+- Cloud Intelligence provider boundary; no mandatory local LLM.
+- Add Project from GitHub backend with existing-clone reuse and local project catalog.
+- Strict Release Gate with artifact discovery and SHA-256 evidence.
+- Minimal desktop UI with work-mode selector and Add Project from GitHub.
+- Windows/Ubuntu CI and package artifacts.
 
-## Remaining v0.1 hardening
+## Next hardening
 
-- Coordinator task graph that drives goals and records evidence automatically.
+- Concrete cloud-provider adapters and secure credential configuration.
+- Cloud/tool orchestration loop that converts plans into approved local tool calls.
+- Validation cache keyed by commit/change set/toolchain.
+- File watcher and changed-file event stream.
+- Targeted test selection for Gradle/Python/Node/CMake.
+- Explicit Node/CMake build profiles.
+- Android SDK/Gradle/ADB project profile.
 - Process registry with attach/cancel/output retention.
-- GitHub repository/branch/commit/PR/Actions/artifact adapter.
-- Explicit Node and CMake project profiles.
-- Android SDK/Gradle/ADB project adapter beyond discovery.
-- First generic code-level dead-link/orphan-route adapters where project structure permits deterministic analysis.
+- Direct GitHub API integration for PRs, Actions logs, artifacts and releases.
 
-## v0.2 Heavy QA
+## Heavy QA
 
-Android/desktop screenshot adapters; broken-button/navigation automation; RTL and localization completeness; UI overflow/resource validation; artifact manifests.
+- Android/desktop screenshot adapters.
+- Broken-button and navigation automation.
+- RTL and localization completeness.
+- UI overflow and missing-resource checks.
+- Dead-link and orphan-route analysis.
+- Signed installer/release validation.
 
 ## Later
 
-Multi-provider model adapters; Compact & Resume/handoff snapshots; desktop automation permission broker; signed installers and controlled release publication.
+Optional local-model privacy/offline adapters, embeddings/code search, Compact & Resume snapshots, desktop automation permission broker and controlled signed release publication.

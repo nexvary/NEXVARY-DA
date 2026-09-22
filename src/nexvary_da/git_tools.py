@@ -29,8 +29,29 @@ class GitTools:
     def diff(self, *paths: str) -> ProcessResult:
         return self._git("diff", "--", *paths)
 
+    def changed_files(self) -> list[str]:
+        commands = (
+            ("diff", "--name-only"),
+            ("diff", "--cached", "--name-only"),
+            ("ls-files", "--others", "--exclude-standard"),
+        )
+        changed: set[str] = set()
+        for args in commands:
+            result = self._git(*args)
+            if result.returncode != 0:
+                continue
+            changed.update(line.strip() for line in result.stdout.splitlines() if line.strip())
+        return sorted(changed)
+
+    def commit_staged(self, message: str) -> ProcessResult:
+        if not message.strip():
+            raise ValueError("Commit message cannot be empty")
+        self.guard.require(self.root, Permission.GIT_COMMIT, must_exist=True)
+        return self._git("commit", "-m", message, timeout=300)
+
     def push(self, remote: str = "origin", branch: str | None = None) -> ProcessResult:
         self.guard.require(self.root, Permission.GIT_PUSH, must_exist=True)
+        self.guard.require(self.root, Permission.NETWORK, must_exist=True)
         target = branch or self.branch()
         if not target:
             raise ValueError("Cannot determine current Git branch")

@@ -15,6 +15,7 @@ from .process import ProcessRunner
 from .release_gate import ReleaseGate
 from .state import ProjectState
 from .terminal import PersistentTerminal
+from .terminal_pool import TerminalPool
 
 
 _CONFIG_DIR = ".nexvary-da"
@@ -91,12 +92,17 @@ class ProjectRuntime:
         self.files = FileTools(self.guard, self.root)
         self.git = GitTools(self.guard, self.runner, self.root)
         self.agents = AgentPool(self.state)
+        self.terminals = TerminalPool(self.guard, self.root)
 
     def terminal(self) -> PersistentTerminal:
-        return PersistentTerminal(self.guard, self.root)
+        return self.terminals.get("default")
+
+    def terminal_for(self, owner: str) -> PersistentTerminal:
+        return self.terminals.get(owner)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)
 
     def close(self) -> None:
+        self.terminals.close_all()
         self.state.close()

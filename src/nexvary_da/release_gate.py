@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sys
@@ -32,10 +33,12 @@ class GateReport:
     project_kind: str
     steps: list[GateStep]
     ready: bool
+    strict_release: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
             "project_kind": self.project_kind,
+            "strict_release": self.strict_release,
             "ready": self.ready,
             "steps": [asdict(step) for step in self.steps],
         }
@@ -45,6 +48,9 @@ _PATTERNS = {
     "private_key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     "github_token": re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b"),
     "aws_access_key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+}
+_ARTIFACT_SUFFIXES = {
+    ".whl", ".gz", ".zip", ".apk", ".aab", ".exe", ".msi", ".deb"
 }
 
 
@@ -68,8 +74,35 @@ def _scan_secrets(root: Path) -> list[str]:
     return findings
 
 
+def _release_artifacts(root: Path) -> list[Path]:
+    candidates: list[Path] = []
+    search_roots = (
+        root / "dist",
+        root / "build" / "outputs",
+        root / "app" / "build" / "outputs",
+    )
+    for base in search_roots:
+        if not base.exists():
+            continue
+        for path in base.rglob("*"):
+            if path.is_file() and (
+                path.suffix.lower() in _ARTIFACT_SUFFIXES
+                or path.name.lower().endswith(".tar.gz")
+            ):
+                candidates.append(path)
+    return sorted(set(candidates))
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 class ReleaseGate:
-    """Runs checks it can prove; unsupported checks never masquerade as PASS."""
+    """Runs only checks it can prove; missing strict-release evidence blocks READY."""
 
     def __init__(self, root: str | os.PathLike[str], runner: ProcessRunner, state: ProjectState):
         self.root = Path(root).resolve(strict=True)
@@ -85,53 +118,143 @@ class ReleaseGate:
             result.stdout[-6000:].strip(),
         )
 
-    def run(self) -> GateReport:
+    def _artifact_steps(self, *, strict: bool) -> list[GateStep]:
+        artifacts = _release_artifacts(self.root)
+        if not artifacts:
+            status = GateStatus.NOT_CONFIGURED if strict else GateStatus.SKIP
+            return [
+                GateStep(
+                    "artifact_validation",
+                    status,
+                    strict,
+                    "No recognized release artifacts found in configured output locations",
+                ),
+                GateStep("sha256", status, strict, "No release artifact available to hash"),
+            ]
+        invalid = [path for path in artifacts if path.stat().st_size <= 0]
+        validation = GateStep(
+            "artifact_validation",
+            GateStatus.FAIL if invalid else GateStatus.PASS,
+            strict,
+            (
+                "Empty artifact(s): " + ", ".join(str(p.relative_to(self.root)) for p in invalid)
+                if invalid
+                else "\n".join(str(p.relative_to(self.root)) for p in artifacts)
+            ),
+        )
+        hashes = "\n".join(
+            f"{_sha256(path)}  {path.relative_to(self.root)}" for path in artifacts
+        )
+        return [validation, GateStep("sha256", GateStatus.PASS, strict, hashes)]
+
+    def run(self, *, strict: bool = False) -> GateReport:
         kind = detect_project_kind(self.root)
         steps: list[GateStep] = []
+
         if kind == "python":
             steps.append(self._cmd("compile", [sys.executable, "-m", "compileall", "-q", "src"]))
             if (self.root / "tests").is_dir():
-                steps.append(self._cmd("unit_tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"]))
+                steps.append(
+                    self._cmd(
+                        "unit_tests",
+                        [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"],
+                    )
+                )
             else:
-                steps.append(GateStep("unit_tests", GateStatus.NOT_CONFIGURED, True, "tests/ is missing"))
+                steps.append(
+                    GateStep("unit_tests", GateStatus.NOT_CONFIGURED, True, "tests/ is missing")
+                )
         elif kind == "gradle":
             wrapper = "gradlew.bat" if os.name == "nt" else "./gradlew"
-            steps.extend([
-                self._cmd("tests", [wrapper, "test"]),
-                self._cmd("lint", [wrapper, "lint"]),
-                self._cmd("package", [wrapper, "assembleDebug"]),
-            ])
+            steps.extend(
+                [
+                    self._cmd("unit_tests", [wrapper, "test"]),
+                    self._cmd("lint", [wrapper, "lint"]),
+                    self._cmd("package", [wrapper, "assembleDebug"]),
+                ]
+            )
         elif kind == "node":
-            steps.append(self._cmd("tests", ["npm", "test"]))
-            steps.append(GateStep("build", GateStatus.NOT_CONFIGURED, True, "Explicit Node build profile required"))
+            steps.append(self._cmd("unit_tests", ["npm", "test"]))
+            steps.append(
+                GateStep(
+                    "build",
+                    GateStatus.NOT_CONFIGURED,
+                    True,
+                    "Explicit Node build profile required",
+                )
+            )
         elif kind == "cmake":
-            steps.append(GateStep("cmake_build", GateStatus.NOT_CONFIGURED, True, "Explicit CMake build profile required"))
+            steps.append(
+                GateStep(
+                    "cmake_build",
+                    GateStatus.NOT_CONFIGURED,
+                    True,
+                    "Explicit CMake build profile required",
+                )
+            )
         else:
-            steps.append(GateStep("compile", GateStatus.NOT_CONFIGURED, True, "No supported project profile detected"))
+            steps.append(
+                GateStep(
+                    "compile",
+                    GateStatus.NOT_CONFIGURED,
+                    True,
+                    "No supported project profile detected",
+                )
+            )
 
         secrets = _scan_secrets(self.root)
-        steps.append(GateStep(
-            "secrets_scan",
-            GateStatus.FAIL if secrets else GateStatus.PASS,
-            True,
-            "\n".join(secrets[:50]) if secrets else "No high-confidence secret patterns found",
-        ))
+        steps.append(
+            GateStep(
+                "secrets_scan",
+                GateStatus.FAIL if secrets else GateStatus.PASS,
+                True,
+                "\n".join(secrets[:50])
+                if secrets
+                else "No high-confidence secret patterns found",
+            )
+        )
         if (self.root / ".git").exists():
             steps.append(self._cmd("git_diff_check", ["git", "diff", "--check"]))
+            steps.append(self._cmd("git_status", ["git", "status", "--porcelain=v1", "--branch"]))
         else:
-            steps.append(GateStep("git_diff_check", GateStatus.SKIP, False, "Not a Git worktree"))
+            steps.append(
+                GateStep(
+                    "git_diff_check",
+                    GateStatus.NOT_CONFIGURED if strict else GateStatus.SKIP,
+                    strict,
+                    "Not a Git worktree",
+                )
+            )
 
-        for name, reason in (
+        strict_checks = (
+            ("integration_tests", "No project-specific integration-test adapter configured"),
+            ("static_analysis", "No project-specific static-analysis adapter configured"),
             ("dead_links", "Project-specific crawler not configured"),
             ("orphan_pages", "Project-specific route graph not configured"),
+            ("broken_buttons", "No UI interaction adapter configured"),
+            ("navigation", "No navigation adapter configured"),
             ("ui_gate", "No project-specific UI adapter configured"),
-            ("localization", "No localization adapter configured"),
-            ("artifact_validation", "No release artifact profile configured"),
-        ):
-            steps.append(GateStep(name, GateStatus.SKIP, False, reason))
+            ("rtl", "No RTL validation adapter configured"),
+            ("localization", "No localization completeness adapter configured"),
+        )
+        for name, reason in strict_checks:
+            steps.append(
+                GateStep(
+                    name,
+                    GateStatus.NOT_CONFIGURED if strict else GateStatus.SKIP,
+                    strict,
+                    reason,
+                )
+            )
+        steps.extend(self._artifact_steps(strict=strict))
 
-        ready = all(step.status == GateStatus.PASS for step in steps if step.required)
-        report = GateReport(kind, steps, ready)
+        ready = all(
+            step.status == GateStatus.PASS for step in steps if step.required
+        )
+        report = GateReport(kind, steps, ready, strict_release=strict)
         self.state.record_gate(ready, report.to_dict())
-        self.state.set_meta("last_release_gate", report.to_dict())
+        self.state.set_meta(
+            "last_release_gate" if strict else "last_validation_gate",
+            report.to_dict(),
+        )
         return report

@@ -2,40 +2,55 @@
 
 ## Default posture
 
-A directory is inaccessible until it is initialized as an approved project. `read` is mandatory for an approved root; every mutating or higher-risk capability is independent and opt-in.
+An approved project has a canonical Workspace Root. Capabilities are independent and opt-in.
 
-Capabilities:
+Current capabilities:
 
 - `read`
 - `write`
+- `delete`
 - `shell`
+- `network`
+- `git_commit`
 - `git_push`
 - `release`
 - `adb`
 - `desktop_automation`
 
-Granting `shell` does not grant `git_push`; granting `write` does not grant `release`.
+`write` does not imply `delete`. `git_commit` does not imply `git_push`. `git_push` also requires `network`. A strict release gate requires `release`.
+
+## Cloud intelligence
+
+Cloud reasoning requires `network` permission. The cloud provider receives only explicitly constructed reasoning context. The local filesystem is not automatically serialized or uploaded.
+
+A cloud model never bypasses Workspace Guard; local tools remain separate capabilities.
 
 ## Path containment
 
-Workspace Guard resolves existing paths canonically. For new paths it resolves the nearest existing ancestor before authorization, preventing a symlink/junction inside an approved root from silently redirecting access outside the root.
+Workspace Guard resolves existing paths canonically. New paths resolve their nearest existing ancestor before authorization, preventing a symlink/junction from silently escaping an approved root.
+
+## Project import
+
+Add Project from GitHub is restricted to canonical HTTPS GitHub repository URLs in v0.1. Clones are placed only below a selected Projects Root. Existing directories are reused only when they are Git worktrees whose `origin` matches the requested repository.
 
 ## Shell
 
-Persistent shells are real long-lived processes and require the explicit `shell` capability. v0.1 does not yet implement command-level allowlists; shell permission is therefore a strong capability.
+Persistent shells are real long-lived processes and require `shell`. Terminals can be separated per worker identity through TerminalPool.
 
-## Internal state
+Command-level allowlists are not yet implemented, so shell remains a strong capability.
 
-`.nexvary-da/` is reserved control-plane metadata created after the user approves a project. Source-file write permission remains independent from this internal state store.
+## Git
 
-## Sensitive actions
+Reading status/diff uses local shell access. Creating a commit requires `git_commit`. Pushing requires both `git_push` and `network`.
 
-Git push, release publication, ADB and desktop automation are distinct capabilities. Higher-level adapters must check the relevant capability even if shell access exists.
+## Releases
+
+Release mode is intentionally fail-closed. Missing required heavy adapters are reported as `NOT_CONFIGURED`, which prevents READY.
 
 ## Secrets
 
-The v0.1 Release Gate includes a local high-confidence scanner for common private-key headers, GitHub token forms and AWS access-key identifiers. It is not a substitute for enterprise secret scanning.
+The Release Gate includes a local high-confidence scanner for common private-key headers, GitHub token formats and AWS access-key identifiers. It is not a replacement for dedicated enterprise secret scanning.
 
-## v0.1 non-goals
+## Non-goals
 
-No whole-machine filesystem access, automatic privilege elevation, browser credential extraction, silent Git push, silent release publication or unbounded desktop automation.
+No whole-machine filesystem access, automatic privilege elevation, silent deletion, silent network access, silent Git push, silent release publication, browser credential extraction or unrestricted desktop automation.

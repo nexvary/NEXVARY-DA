@@ -1,24 +1,34 @@
 # Release Gate v0.1
 
-The gate reports evidence, not optimism.
+## Two validation levels
+
+Development validation may run only the checks that are currently applicable and configured.
+
+Strict Release Mode is fail-closed: every required release category must produce evidence. Missing adapters are `NOT_CONFIGURED` and block `ready=true`.
 
 ## Status vocabulary
 
-- **PASS** — the check actually ran and succeeded.
+- **PASS** — the check ran and succeeded.
 - **FAIL** — the check ran and failed.
-- **NOT_CONFIGURED** — a required check cannot run because a project profile is missing.
-- **SKIP** — an optional or project-specific adapter is not configured.
+- **NOT_CONFIGURED** — required evidence is unavailable.
+- **SKIP** — optional/non-strict adapter not configured.
 
-A release is `ready=true` only when every required step is PASS.
+## Current executable checks
 
-## v0.1 adapters
+Depending on project kind:
 
-For Python: `compileall`, unittest discovery, secrets scan and (in Git worktrees) `git diff --check`.
+- Compile/build.
+- Unit tests.
+- Gradle lint/package where applicable.
+- Secrets scan.
+- Git diff check.
+- Git status.
+- Artifact discovery in known output locations.
+- Non-empty artifact validation.
+- SHA-256 generation for recognized artifacts.
 
-For Gradle/Android: wrapper `test`, `lint`, `assembleDebug`, secrets scan and Git diff check.
+## Strict release obligations awaiting adapters
 
-Node and CMake are detected but v0.1 refuses to guess project-specific build semantics; an explicit profile is required.
+Until project-specific implementations exist, strict Release Mode blocks READY for missing integration tests, static analysis, dead links, orphan pages, broken buttons, navigation, UI gate, RTL and localization checks.
 
-## Planned heavy QA adapters
-
-Dead links, orphan pages, broken-button/navigation probes, RTL, localization completeness, UI overflow, missing-resource validation, artifact validation, signing and release publication. Until a real adapter exists these checks are never shown as PASS.
+This is intentional: unsupported checks are never reported as PASS.

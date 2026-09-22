@@ -44,6 +44,12 @@ class FileTools:
                 os.unlink(temp_name)
         return path
 
+    def delete_file(self, relative: str | os.PathLike[str]) -> None:
+        path = self.guard.require(self._path(relative), Permission.DELETE, must_exist=True)
+        if not path.is_file() and not path.is_symlink():
+            raise IsADirectoryError(path)
+        path.unlink()
+
     def patch_exact(
         self,
         relative: str | os.PathLike[str],
