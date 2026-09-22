@@ -135,7 +135,7 @@ class PersistentTerminal:
                     if prefix and not self._is_windows:
                         lines.append(prefix + "\n")
                     return TerminalResult(
-                        command, code, "".join(lines).rstrip(), time.monotonic() - started
+                        command, code, "".join(lines).strip("\r\n"), time.monotonic() - started
                     )
                 lines.append(cleaned)
 
