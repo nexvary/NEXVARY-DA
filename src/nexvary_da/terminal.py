@@ -106,11 +106,16 @@ class PersistentTerminal:
                 if item is None:
                     raise TerminalError("Shell output stream closed")
                 stripped = item.strip()
-                if stripped.startswith(marker):
+                marker_pos = stripped.find(marker)
+                if marker_pos >= 0:
+                    code_text = stripped[marker_pos + len(marker):].strip()
                     try:
-                        code = int(stripped[len(marker):])
+                        code = int(code_text)
                     except ValueError as exc:
                         raise TerminalError(f"Invalid shell result marker: {stripped}") from exc
+                    prefix = stripped[:marker_pos].strip()
+                    if prefix and not self._is_windows:
+                        lines.append(prefix + "\n")
                     return TerminalResult(
                         command, code, "".join(lines).rstrip(), time.monotonic() - started
                     )
