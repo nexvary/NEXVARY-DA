@@ -76,12 +76,15 @@ class PersistentTerminal:
         finally:
             self._queue.put(None)
 
-    def _wrapped(self, command: str, marker: str) -> str:
+    def _wrapped(self, command: str, start_marker: str, marker: str) -> str:
         if self._is_windows:
-            # /V:ON makes !errorlevel! expand when the marker line executes,
-            # after the user's command has completed.
-            return f"{command}\necho {marker}!errorlevel!"
-        return f'{{ {command}; }}; __nx_rc=$?; printf "\\n{marker}%s\\n" "$__nx_rc"'
+            # Frame every call so prompt/newline residue from a previous command
+            # can never be mistaken for the next command's output.
+            return f"echo {start_marker}\n{command}\necho {marker}!errorlevel!"
+        return (
+            f'printf "{start_marker}\\n"; '
+            f'{{ {command}; }}; __nx_rc=$?; printf "\\n{marker}%s\\n" "$__nx_rc"'
+        )
 
     def run(self, command: str, *, timeout: float = 300) -> TerminalResult:
         if not command.strip():
@@ -89,12 +92,15 @@ class PersistentTerminal:
         with self._lock:
             if self._proc.poll() is not None:
                 raise TerminalError(f"Shell has exited with code {self._proc.returncode}")
-            marker = f"__NEXVARY_DA_RC_{uuid.uuid4().hex}__="
+            token = uuid.uuid4().hex
+            start_marker = f"__NEXVARY_DA_START_{token}__"
+            marker = f"__NEXVARY_DA_RC_{token}__="
             assert self._proc.stdin is not None
             started = time.monotonic()
-            self._proc.stdin.write(self._wrapped(command, marker) + "\n")
+            self._proc.stdin.write(self._wrapped(command, start_marker, marker) + "\n")
             self._proc.stdin.flush()
             lines: list[str] = []
+            collecting = False
             deadline = started + timeout
             while True:
                 remaining = deadline - time.monotonic()
@@ -114,6 +120,10 @@ class PersistentTerminal:
                 if self._is_windows and cleaned.startswith(self._windows_prompt):
                     cleaned = cleaned[len(self._windows_prompt):]
                 stripped = cleaned.strip()
+                if not collecting:
+                    if start_marker in stripped:
+                        collecting = True
+                    continue
                 marker_pos = stripped.find(marker)
                 if marker_pos >= 0:
                     code_text = stripped[marker_pos + len(marker):].strip()
