@@ -54,10 +54,10 @@ class PersistentTerminal:
 
     def _shell_argv(self) -> list[str]:
         if self._is_windows:
-            shell = shutil.which("pwsh") or shutil.which("powershell")
+            shell = os.environ.get("COMSPEC") or shutil.which("cmd")
             if not shell:
-                raise TerminalError("PowerShell was not found")
-            return [shell, "-NoLogo", "-NoProfile", "-Command", "-"]
+                raise TerminalError("cmd.exe was not found")
+            return [shell, "/Q", "/D", "/V:ON", "/K"]
         shell = shutil.which("bash") or shutil.which("sh")
         if not shell:
             raise TerminalError("No POSIX shell was found")
@@ -73,12 +73,9 @@ class PersistentTerminal:
 
     def _wrapped(self, command: str, marker: str) -> str:
         if self._is_windows:
-            return (
-                f"$global:LASTEXITCODE = 0; & {{ {command} }}; "
-                "$nxSuccess = $?; $nxCode = $LASTEXITCODE; "
-                "if ($null -eq $nxCode) { if ($nxSuccess) { $nxCode = 0 } else { $nxCode = 1 } }; "
-                f'Write-Output "{marker}$nxCode"'
-            )
+            # /V:ON makes !errorlevel! expand when the marker line executes,
+            # after the user's command has completed.
+            return f"{command}\necho {marker}!errorlevel!"
         return f'{{ {command}; }}; __nx_rc=$?; printf "\\n{marker}%s\\n" "$__nx_rc"'
 
     def run(self, command: str, *, timeout: float = 300) -> TerminalResult:
