@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "NEXVARY" }]
-dependencies = []
+dependencies = ["mcp>=2,<3"]
 
 [project.scripts]
 nexvary-da = "nexvary_da.cli:main"
