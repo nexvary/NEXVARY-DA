@@ -1,17 +1,22 @@
 # NEXVARY-DA Roadmap
 
-## v0.1 Core — current
+## v0.1 Core — implemented and being hardened
 
-Approved workspaces, capability model, SQLite state, persistent terminal, file/process/Git tools, environment discovery, reusable agent slots, executable Builder/QA adapters, Tool Kernel, Release Gate, Python/Gradle support, minimal desktop UI, Windows/Ubuntu CI.
+Approved workspaces and capabilities; SQLite state; persistent terminal; file/process/Git tools; environment discovery; reusable agent slots; executable Builder/QA adapters; Tool Kernel; durable Goal/Definition-of-Done engine; project-bound local MCP transport; Release Gate; Python/Gradle support; minimal desktop UI; Windows/Ubuntu CI; Python package artifacts.
 
-## v0.2 Orchestration
+## Remaining v0.1 hardening
 
-MCP local transport over Tool Kernel; Coordinator task graph and Definition-of-Done engine; process registry with attach/cancel/output retention; Node/CMake project profiles; GitHub PR/Actions/artifact adapter.
+- Coordinator task graph that drives goals and records evidence automatically.
+- Process registry with attach/cancel/output retention.
+- GitHub repository/branch/commit/PR/Actions/artifact adapter.
+- Explicit Node and CMake project profiles.
+- Android SDK/Gradle/ADB project adapter beyond discovery.
+- First generic code-level dead-link/orphan-route adapters where project structure permits deterministic analysis.
 
-## v0.3 Heavy QA
+## v0.2 Heavy QA
 
-Route graph and orphan-page detector; link checker policies; Android/desktop screenshot adapters; RTL/localization completeness; broken-button/navigation automation; artifact manifests and validation.
+Android/desktop screenshot adapters; broken-button/navigation automation; RTL and localization completeness; UI overflow/resource validation; artifact manifests.
 
 ## Later
 
-Multi-provider agent adapters, Compact & Resume/handoff snapshots, ADB lab adapter, desktop permission broker, signed release workflows.
+Multi-provider model adapters; Compact & Resume/handoff snapshots; desktop automation permission broker; signed installers and controlled release publication.
