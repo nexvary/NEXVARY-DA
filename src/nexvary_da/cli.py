@@ -6,6 +6,7 @@ from dataclasses import asdict
 
 from .agents import AgentRole, BuilderAgent, QAAgent
 from .environment import discover_environment
+from .mcp_server import run_mcp
 from .permissions import Permission
 from .project import ProjectRuntime, init_project
 from .ui import launch_ui
@@ -54,6 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("gate", "Run the release gate"),
         ("shell", "Open the persistent shell loop"),
         ("ui", "Launch the minimal desktop UI"),
+        ("mcp", "Serve the approved project over local MCP stdio"),
     ):
         command = sub.add_parser(name, help=help_text)
         command.add_argument("path", nargs="?", default=".")
@@ -80,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "ui":
         launch_ui(args.path)
+        return 0
+
+    if args.command == "mcp":
+        run_mcp(args.path)
         return 0
 
     runtime = ProjectRuntime(args.path)
