@@ -77,7 +77,7 @@ jobs:
           retention-days: 14
 
       - name: Build native executable
-        run: python -m PyInstaller --noconfirm --clean --onefile --name NEXVARY-DA --distpath dist-native --workpath build-native --collect-all mcp packaging/launcher.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --name NEXVARY-DA --distpath dist-native --workpath build-native packaging/launcher.py
 
       - name: Native executable smoke test
         run: python tests/native_binary_smoke.py
