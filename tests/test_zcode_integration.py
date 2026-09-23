@@ -55,21 +55,22 @@ class ZCodeIntegrationTests(unittest.TestCase):
             )
             state = ProjectState(root)
             runner = FakeRunner()
-            with patch.dict(os.environ, {"NEXVARY_DA_ZCODE_BIN": str(fake_zcode)}, clear=False):
-                result = ZCodeAdapter(guard, runner, state, root).plan("inspect project")
-            self.assertTrue(result.success)
-            args = runner.calls[0]["args"]
-            self.assertEqual("plan", args[args.index("--mode") + 1])
-            self.assertNotIn("yolo", args)
-            self.assertEqual("json", args[args.index("--output-format") + 1])
-            self.assertIn("--disallowed-tools", args)
-            self.assertIn("Bash", args)
-            self.assertIn("Write", args)
-            self.assertEqual(
-                str(root / ".nexvary-da" / "zcode-data"),
-                runner.calls[0]["env"]["ZCODE_DATA_BASE_DIR"],
-            )
-            state.close()
+            try:
+                with patch.dict(os.environ, {"NEXVARY_DA_ZCODE_BIN": str(fake_zcode)}, clear=False):
+                    result = ZCodeAdapter(guard, runner, state, root).plan("inspect project")
+                self.assertTrue(result.success)
+                args = runner.calls[0]["args"]
+                self.assertEqual("plan", args[args.index("--mode") + 1])
+                self.assertNotIn("yolo", args)
+                self.assertEqual("json", args[args.index("--output-format") + 1])
+                self.assertIn("--disallowed-tools", args)
+                self.assertIn("Bash", args)
+                self.assertIn("Write", args)
+                expected_data_dir = str((root.resolve() / ".nexvary-da" / "zcode-data").resolve())
+                actual_data_dir = str(Path(runner.calls[0]["env"]["ZCODE_DATA_BASE_DIR"]).resolve())
+                self.assertEqual(expected_data_dir, actual_data_dir)
+            finally:
+                state.close()
 
     def test_adapter_requires_network_before_running(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -87,11 +88,13 @@ class ZCodeIntegrationTests(unittest.TestCase):
             )
             state = ProjectState(root)
             runner = FakeRunner()
-            with patch.dict(os.environ, {"NEXVARY_DA_ZCODE_BIN": str(fake_zcode)}, clear=False):
-                with self.assertRaises(Exception):
-                    ZCodeAdapter(guard, runner, state, root).plan("inspect project")
-            self.assertEqual([], runner.calls)
-            state.close()
+            try:
+                with patch.dict(os.environ, {"NEXVARY_DA_ZCODE_BIN": str(fake_zcode)}, clear=False):
+                    with self.assertRaises(Exception):
+                        ZCodeAdapter(guard, runner, state, root).plan("inspect project")
+                self.assertEqual([], runner.calls)
+            finally:
+                state.close()
 
     def test_cli_exposes_three_engine_modes(self):
         parser = build_parser()
