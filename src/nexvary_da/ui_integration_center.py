@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .ui_theme import PALETTE
+from .ui_theme import PALETTE, section_color
 
 
 _PLUGIN_HELP = {
@@ -80,11 +80,16 @@ class IntegrationCenter:
             parent,
             text=text,
             command=command,
-            bg=PALETTE.gold if accent else PALETTE.surface_alt,
-            fg=PALETTE.background if accent else PALETTE.text,
+            bg=PALETTE.action if accent else PALETTE.surface_alt,
+            fg=PALETTE.background if accent else PALETTE.action,
+            activebackground=PALETTE.action_hover,
+            activeforeground=PALETTE.background,
             relief="flat",
             bd=0,
             cursor="hand2",
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
             padx=self.px(10),
             pady=self.px(6),
             font=(self.font, self.px(8), "bold"),
@@ -94,7 +99,7 @@ class IntegrationCenter:
         tk = self.tk
         top = tk.Frame(self.window, bg=PALETTE.surface)
         top.pack(fill="x")
-        self.label(top, "TOOLS & INTEGRATIONS", size=14, fg=PALETTE.gold, bold=True).pack(
+        self.label(top, "TOOLS & INTEGRATIONS", size=14, fg=PALETTE.cyan, bold=True).pack(
             side="left", padx=self.px(18), pady=self.px(14)
         )
         self.label(
@@ -112,8 +117,8 @@ class IntegrationCenter:
             bd=0,
         )
         body.pack(fill="both", expand=True, padx=self.px(12), pady=self.px(12))
-        left = tk.Frame(body, bg=PALETTE.surface)
-        right = tk.Frame(body, bg=PALETTE.surface)
+        left = tk.Frame(body, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
+        right = tk.Frame(body, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
         body.add(left, width=self.px(310), minsize=self.px(270))
         body.add(right, minsize=self.px(480))
         self.left, self.right = left, right
@@ -122,7 +127,7 @@ class IntegrationCenter:
             left,
             bg=PALETTE.surface_alt,
             fg=PALETTE.text,
-            selectbackground=PALETTE.blue,
+            selectbackground=PALETTE.purple,
             selectforeground=PALETTE.text,
             relief="flat",
             bd=0,
@@ -139,7 +144,7 @@ class IntegrationCenter:
             bottom,
             textvariable=self.status_var,
             bg=PALETTE.surface,
-            fg=PALETTE.blue_bright,
+            fg=PALETTE.cyan,
             anchor="w",
             font=(self.font, self.px(8)),
         ).pack(side="left", fill="x", expand=True, padx=self.px(16), pady=self.px(10))
@@ -188,9 +193,12 @@ class IntegrationCenter:
             textvariable=variable,
             bg=PALETTE.surface_alt,
             fg=PALETTE.text,
-            insertbackground=PALETTE.gold,
+            insertbackground=PALETTE.action,
             relief="flat",
             bd=0,
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.cyan,
             font=(self.font, self.px(9)),
         ).pack(side="left", fill="x", expand=True, ipady=self.px(6))
         if browse:
@@ -216,7 +224,17 @@ class IntegrationCenter:
         name, purpose, help_text = _PLUGIN_HELP[plugin_id]
         content = self.tk.Frame(self.right, bg=PALETTE.surface)
         content.pack(fill="both", expand=True, padx=self.px(18), pady=self.px(16))
-        self.label(content, name, size=15, fg=PALETTE.gold, bold=True).pack(anchor="w")
+        plugin_colors = {
+            "fastmcp": PALETTE.cyan,
+            "cua-driver": PALETTE.blue,
+            "oya-browser": PALETTE.purple,
+            "voicestudio": PALETTE.yellow,
+            "qwen-image-2.1": PALETTE.magenta,
+            "moneyprinterturbo": PALETTE.orange,
+        }
+        plugin_color = plugin_colors.get(plugin_id, PALETTE.cyan)
+        self.tk.Frame(content, bg=plugin_color, height=self.px(3)).pack(fill="x", pady=(0, self.px(10)))
+        self.label(content, name, size=15, fg=plugin_color, bold=True).pack(anchor="w")
         self.label(content, purpose, size=9, fg=PALETTE.text).pack(anchor="w", pady=(self.px(3), 0))
         self.label(content, help_text, size=8, fg=PALETTE.muted).pack(anchor="w", pady=(0, self.px(12)))
 

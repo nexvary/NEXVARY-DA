@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 
-from .ui_theme import PALETTE
+from .ui_theme import PALETTE, section_color
 
 
 class ToolBox:
@@ -54,11 +54,16 @@ class ToolBox:
             parent,
             text=text,
             command=command,
-            bg=PALETTE.gold if accent else PALETTE.surface_alt,
-            fg=PALETTE.background if accent else PALETTE.text,
+            bg=PALETTE.action if accent else PALETTE.surface_alt,
+            fg=PALETTE.background if accent else PALETTE.action,
+            activebackground=PALETTE.action_hover,
+            activeforeground=PALETTE.background,
             relief="flat",
             bd=0,
             cursor="hand2",
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
             padx=self.px(12),
             pady=self.px(7),
             font=(self.font, self.px(8), "bold"),
@@ -68,7 +73,7 @@ class ToolBox:
         tk = self.tk
         top = tk.Frame(self.window, bg=PALETTE.surface)
         top.pack(fill="x")
-        self.label(top, "NEXVARY TOOL BOX", size=15, fg=PALETTE.gold, bold=True).pack(
+        self.label(top, "NEXVARY TOOL BOX", size=15, fg=PALETTE.cyan, bold=True).pack(
             side="left", padx=self.px(18), pady=self.px(14)
         )
         self.label(
@@ -86,8 +91,8 @@ class ToolBox:
             bd=0,
         )
         body.pack(fill="both", expand=True, padx=self.px(12), pady=self.px(12))
-        self.left = tk.Frame(body, bg=PALETTE.surface)
-        self.right = tk.Frame(body, bg=PALETTE.surface)
+        self.left = tk.Frame(body, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
+        self.right = tk.Frame(body, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
         body.add(self.left, width=self.px(250), minsize=self.px(220))
         body.add(self.right, minsize=self.px(540))
 
@@ -106,7 +111,7 @@ class ToolBox:
             bottom,
             textvariable=self.output_var,
             bg=PALETTE.surface,
-            fg=PALETTE.blue_bright,
+            fg=PALETTE.cyan,
             anchor="w",
             justify="left",
             wraplength=self.px(760),
@@ -126,7 +131,9 @@ class ToolBox:
         self._clear()
         frame = self.tk.Frame(self.right, bg=PALETTE.surface)
         frame.pack(fill="both", expand=True, padx=self.px(20), pady=self.px(18))
-        self.label(frame, category, size=16, fg=PALETTE.gold, bold=True).pack(anchor="w")
+        category_color = section_color(category)
+        self.tk.Frame(frame, bg=category_color, height=self.px(3)).pack(fill="x", pady=(0, self.px(10)))
+        self.label(frame, category, size=16, fg=category_color, bold=True).pack(anchor="w")
         renderer = getattr(self, f"_render_{category.lower()}")
         renderer(frame)
 
@@ -141,9 +148,12 @@ class ToolBox:
             textvariable=var,
             bg=PALETTE.surface_alt,
             fg=PALETTE.text,
-            insertbackground=PALETTE.gold,
+            insertbackground=PALETTE.action,
             relief="flat",
             bd=0,
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.cyan,
             font=(self.font, self.px(9)),
         ).pack(fill="x", ipady=self.px(7))
         return var
@@ -320,7 +330,7 @@ class ToolBox:
                 indicatoron=False,
                 bg=PALETTE.surface_alt,
                 fg=PALETTE.text,
-                selectcolor=PALETTE.blue,
+                selectcolor=PALETTE.purple,
                 relief="flat",
                 bd=0,
                 padx=self.px(10),

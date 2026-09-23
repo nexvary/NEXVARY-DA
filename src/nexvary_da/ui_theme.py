@@ -5,23 +5,66 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class Palette:
-    background: str = "#0B1016"
-    surface: str = "#111923"
-    surface_alt: str = "#16212D"
-    border: str = "#2D3946"
-    gold: str = "#D4AF37"
-    gold_dim: str = "#8D7529"
-    blue: str = "#6A88A0"
-    blue_bright: str = "#8EB5D1"
-    text: str = "#E8EDF2"
-    muted: str = "#8F9CAA"
-    success: str = "#58B487"
-    warning: str = "#D7A947"
-    danger: str = "#D66B6B"
-    terminal: str = "#070A0E"
+    # Deep chassis
+    background: str = "#050910"
+    surface: str = "#0A111A"
+    surface_alt: str = "#0F1A26"
+    surface_glow: str = "#132333"
+    terminal: str = "#020509"
+
+    # Chrome / silver frame system
+    border: str = "#5F6D7B"
+    silver: str = "#AEBBC8"
+    silver_bright: str = "#E4EDF5"
+    platinum: str = "#CAD5DF"
+
+    # Neon / electric spectrum
+    cyan: str = "#18E7FF"
+    blue: str = "#4D8DFF"
+    blue_bright: str = "#79B8FF"
+    purple: str = "#9C5CFF"
+    magenta: str = "#FF4FD8"
+    orange: str = "#FF8A3D"
+    yellow: str = "#FFE66D"
+    gold: str = "#F4C84B"
+    gold_dim: str = "#9E8130"
+
+    # Green is intentionally reserved for press/action affordances.
+    action: str = "#39FF88"
+    action_hover: str = "#7CFFB2"
+    action_dark: str = "#062D1B"
+
+    # Semantic state colors do not use action green.
+    success: str = "#20D9F2"
+    warning: str = "#FFB347"
+    danger: str = "#FF5C73"
+
+    text: str = "#F2F7FB"
+    muted: str = "#91A2B3"
 
 
 PALETTE = Palette()
+
+
+_SECTION_COLORS = {
+    "project": PALETTE.cyan,
+    "task": PALETTE.cyan,
+    "build": PALETTE.blue,
+    "desktop": PALETTE.blue,
+    "tools": PALETTE.purple,
+    "browser": PALETTE.purple,
+    "media": PALETTE.magenta,
+    "image": PALETTE.magenta,
+    "video": PALETTE.orange,
+    "voice": PALETTE.yellow,
+    "mcp": PALETTE.cyan,
+    "release": PALETTE.orange,
+    "advanced": PALETTE.silver_bright,
+}
+
+
+def section_color(name: str) -> str:
+    return _SECTION_COLORS.get(name.strip().lower(), PALETTE.blue_bright)
 
 
 def scale_for_screen(width: int, height: int) -> float:

@@ -15,7 +15,7 @@ from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
 from .ui_toolbox import open_toolbox
 from .ui_terminal import TerminalPanel
-from .ui_theme import PALETTE, scale_for_screen, status_color
+from .ui_theme import PALETTE, scale_for_screen, section_color, status_color
 
 
 class DeveloperAgentUI:
@@ -56,22 +56,49 @@ class DeveloperAgentUI:
                              font=(self.font, self.px(size), "bold" if bold else "normal"))
 
     def button(self, parent, text: str, command, *, accent=False, probe_safe=False):
-        widget = self.tk.Button(parent, text=text, command=command, bg=PALETTE.gold if accent else PALETTE.surface_alt,
-                                fg=PALETTE.background if accent else PALETTE.text, relief="flat", bd=0, cursor="hand2",
-                                padx=self.px(10), pady=self.px(6), font=(self.font, self.px(8), "bold"))
+        widget = self.tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=PALETTE.action if accent else PALETTE.surface_alt,
+            fg=PALETTE.background if accent else PALETTE.action,
+            activebackground=PALETTE.action_hover,
+            activeforeground=PALETTE.background,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
+            padx=self.px(10),
+            pady=self.px(6),
+            font=(self.font, self.px(8), "bold"),
+        )
         widget._nexvary_probe_safe = bool(probe_safe)
         return widget
 
     def card(self, parent, bg=None):
-        return self.tk.Frame(parent, bg=bg or PALETTE.surface, highlightbackground=PALETTE.border,
-                             highlightthickness=1, bd=0)
+        return self.tk.Frame(
+            parent,
+            bg=bg or PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
+            highlightthickness=1,
+            bd=0,
+        )
 
     def _build(self) -> None:
         tk = self.tk
-        header = tk.Frame(self.window, bg=PALETTE.surface, height=self.px(72)); header.pack(fill="x"); header.pack_propagate(False)
+        header = tk.Frame(
+            self.window,
+            bg=PALETTE.surface,
+            height=self.px(72),
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        ); header.pack(fill="x"); header.pack_propagate(False)
         brand = tk.Frame(header, bg=PALETTE.surface); brand.pack(side="left", padx=self.px(18), pady=self.px(8))
-        self.label(brand, "NEXVARY", size=17, fg=PALETTE.gold, bold=True).pack(anchor="w")
-        self.label(brand, "DEVELOPER AGENT", size=7, fg=PALETTE.muted, bold=True).pack(anchor="w")
+        self.label(brand, "NEXVARY", size=17, fg=PALETTE.cyan, bold=True).pack(anchor="w")
+        self.label(brand, "DEVELOPER AGENT", size=7, fg=PALETTE.cyan, bold=True).pack(anchor="w")
         ident = tk.Frame(header, bg=PALETTE.surface); ident.pack(side="left", padx=self.px(10))
         self.label(ident, self.runtime.config.name, size=11, bold=True).pack(anchor="w")
         self.label(ident, f"{self.repo} / {self.branch} / {self.commit}", size=7, fg=PALETTE.muted).pack(anchor="w")
@@ -90,6 +117,12 @@ class DeveloperAgentUI:
             x = tk.Label(rail, textvariable=self.status[key], bg=PALETTE.surface_alt, fg=PALETTE.muted,
                          padx=self.px(8), pady=self.px(4), font=(self.font, self.px(7), "bold"))
             x.pack(side="left", padx=self.px(2), pady=self.px(20)); self.status_labels[key] = x
+
+        spectrum = tk.Frame(self.window, bg=PALETTE.background, height=self.px(4))
+        spectrum.pack(fill="x")
+        spectrum.pack_propagate(False)
+        for color in (PALETTE.cyan, PALETTE.blue, PALETTE.purple, PALETTE.magenta, PALETTE.orange, PALETTE.gold):
+            tk.Frame(spectrum, bg=color).pack(side="left", fill="both", expand=True)
 
         self.easy_body = self.card(self.window)
         self.easy_panel = EasyModePanel(self.easy_body, self)
@@ -222,7 +255,7 @@ class DeveloperAgentUI:
         modes = tk.Frame(bar, bg=PALETTE.surface_alt); modes.pack(side="right")
         for mode in WorkMode:
             control = tk.Radiobutton(modes, text=mode.value.upper(), variable=self.mode, value=mode.value, indicatoron=False,
-                                     bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
+                                     bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.purple, relief="flat", bd=0,
                                      padx=self.px(7), pady=self.px(5), font=(self.font, self.px(7), "bold"))
             control._nexvary_probe_safe = True
             control.pack(side="left", padx=1, pady=1)
@@ -257,7 +290,7 @@ class DeveloperAgentUI:
             summary.columnconfigure(col, weight=1); c=self.card(summary, PALETTE.surface_alt); c.grid(row=0,column=col,sticky="nsew",padx=self.px(2))
             self.label(c,title,size=7,fg=PALETTE.muted,bg=PALETTE.surface_alt).pack(anchor="w",padx=self.px(8),pady=(self.px(6),0))
             tk.Label(c,textvariable=self.summary[key],bg=PALETTE.surface_alt,fg=PALETTE.text,font=(self.font,self.px(12),"bold")).pack(anchor="w",padx=self.px(8),pady=(0,self.px(6)))
-        head=tk.Frame(parent,bg=PALETTE.surface); head.pack(fill="x",padx=self.px(12)); self.label(head,"ACTIVITY / EVIDENCE",fg=PALETTE.gold,bold=True).pack(side="left")
+        head=tk.Frame(parent,bg=PALETTE.surface); head.pack(fill="x",padx=self.px(12)); self.label(head,"ACTIVITY / EVIDENCE",fg=PALETTE.cyan,bold=True).pack(side="left")
         self.button(head,"CLEAR",self.clear_log,probe_safe=True).pack(side="right")
         self.log=tk.Text(parent,bg=PALETTE.terminal,fg=PALETTE.text,insertbackground=PALETTE.gold,relief="flat",bd=0,wrap="word",state="disabled",font=(self.mono,self.px(8)))
         self.log.pack(fill="both",expand=True,padx=self.px(12),pady=(self.px(4),self.px(8)))

@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 400
+- Current milestone candidate: Stage 425
 
 ## Verified baseline before Stage 300
 
@@ -81,3 +81,13 @@ Stage 350 is accepted only after the exact candidate head passes Windows and Ubu
 - Strict release verification is available from one visible button.
 
 The candidate is accepted only after the exact Stage 400 head passes Windows and Ubuntu Core CI, runtime UI probe, and native packaging/install smoke tests.
+
+
+## Stage 401-425 visual candidate
+
+- Neon/electric multi-color identity over a deep black/navy chassis.
+- Metallic silver/chrome borders across primary GUI surfaces.
+- Neon green reserved for clickable action affordances; PASS/READY moved to cyan.
+- Easy Mode cards use distinct cyan/blue/purple/magenta/orange/gold accents.
+- Setup Center and Tool Box share the same visual system.
+- Acceptance still requires runtime UI probe, screenshot evidence, Windows CI/installer smoke, and Ubuntu/Debian smoke.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .ui_theme import PALETTE
+from .ui_theme import PALETTE, section_color
 
 
 class EasyModePanel:
@@ -19,9 +19,27 @@ class EasyModePanel:
         self._build()
         self.refresh()
 
-    def _action_card(self, parent, title: str, subtitle: str, button: str, command, *, accent=False):
-        card = self.app.card(parent, PALETTE.surface_alt)
-        self.app.label(card, title, size=11, bold=True, bg=PALETTE.surface_alt).pack(
+    def _action_card(
+        self,
+        parent,
+        title: str,
+        subtitle: str,
+        button: str,
+        command,
+        *,
+        color: str,
+        accent=False,
+    ):
+        card = self.tk.Frame(
+            parent,
+            bg=PALETTE.surface_alt,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
+            highlightthickness=1,
+            bd=0,
+        )
+        self.tk.Frame(card, bg=color, height=self.app.px(3)).pack(fill="x")
+        self.app.label(card, title, size=11, fg=color, bold=True, bg=PALETTE.surface_alt).pack(
             anchor="w", padx=self.app.px(14), pady=(self.app.px(12), self.app.px(2))
         )
         self.app.label(
@@ -42,7 +60,7 @@ class EasyModePanel:
         tk = self.tk
         hero = tk.Frame(self.parent, bg=PALETTE.surface)
         hero.pack(fill="x", padx=self.app.px(22), pady=(self.app.px(22), self.app.px(12)))
-        self.app.label(hero, "What do you want NEXVARY to do?", size=18, fg=PALETTE.gold, bold=True).pack(anchor="w")
+        self.app.label(hero, "What do you want NEXVARY to do?", size=18, fg=PALETTE.cyan, bold=True).pack(anchor="w")
         self.app.label(
             hero,
             "No commands required. Start with the result you want, not the tool you need.",
@@ -52,17 +70,24 @@ class EasyModePanel:
 
         status = tk.Frame(self.parent, bg=PALETTE.surface)
         status.pack(fill="x", padx=self.app.px(22), pady=(0, self.app.px(12)))
-        for index, (title, variable) in enumerate(
+        for index, (title, variable, color) in enumerate(
             (
-                ("PROJECT", self.project_var),
-                ("TOOLS", self.tools_var),
-                ("LAST CHECK", self.last_var),
+                ("PROJECT", self.project_var, PALETTE.cyan),
+                ("TOOLS", self.tools_var, PALETTE.purple),
+                ("LAST CHECK", self.last_var, PALETTE.magenta),
             )
         ):
             status.columnconfigure(index, weight=1)
-            card = self.app.card(status, PALETTE.surface_alt)
+            card = self.tk.Frame(
+                status,
+                bg=PALETTE.surface_alt,
+                highlightbackground=PALETTE.silver,
+                highlightcolor=PALETTE.silver_bright,
+                highlightthickness=1,
+            )
             card.grid(row=0, column=index, sticky="nsew", padx=self.app.px(3))
-            self.app.label(card, title, size=7, fg=PALETTE.muted, bold=True, bg=PALETTE.surface_alt).pack(
+            self.tk.Frame(card, bg=color, height=self.app.px(2)).pack(fill="x")
+            self.app.label(card, title, size=7, fg=color, bold=True, bg=PALETTE.surface_alt).pack(
                 anchor="w", padx=self.app.px(11), pady=(self.app.px(8), 0)
             )
             tk.Label(
@@ -89,6 +114,7 @@ class EasyModePanel:
                 "Describe the goal in normal language. NEXVARY chooses the engine and creates the plan.",
                 "DESCRIBE MY TASK",
                 self.app.plan_task_easy,
+                color=PALETTE.cyan,
                 accent=True,
             ),
             self._action_card(
@@ -97,6 +123,7 @@ class EasyModePanel:
                 "Run the normal engineering checks without choosing commands or test frameworks.",
                 "BUILD & TEST PROJECT",
                 self.app.run_quick_check,
+                color=PALETTE.blue,
             ),
             self._action_card(
                 grid,
@@ -104,6 +131,7 @@ class EasyModePanel:
                 "Use browser, desktop, image, video, voice and MCP through simple forms.",
                 "OPEN TOOL BOX",
                 self.app.open_toolbox,
+                color=PALETTE.magenta,
             ),
             self._action_card(
                 grid,
@@ -111,6 +139,7 @@ class EasyModePanel:
                 "Connect desktop automation, browser, voice, image and video tools from one setup screen.",
                 "OPEN SETUP CENTER",
                 self.app.open_integrations,
+                color=PALETTE.purple,
             ),
             self._action_card(
                 grid,
@@ -118,6 +147,7 @@ class EasyModePanel:
                 "Run the strict release gate and see exactly what still blocks a safe release.",
                 "CHECK RELEASE",
                 self.app.run_release_check,
+                color=PALETTE.orange,
             ),
             self._action_card(
                 grid,
@@ -125,6 +155,7 @@ class EasyModePanel:
                 "Clone or reuse a GitHub project and register it in the safe workspace.",
                 "ADD PROJECT",
                 self.app.add_project,
+                color=PALETTE.gold,
             ),
         )
         for index, card in enumerate(cards):
@@ -142,7 +173,7 @@ class EasyModePanel:
             footer,
             textvariable=self.message_var,
             bg=PALETTE.surface,
-            fg=PALETTE.blue_bright,
+            fg=PALETTE.cyan,
             anchor="w",
             justify="left",
             wraplength=self.app.px(760),
