@@ -7,8 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .agents import AgentPool
+from .android_profile import AndroidTools
 from .errors import ConfigurationError
 from .file_tools import FileTools
+from .github_client import GitHubRESTClient
 from .git_tools import GitTools
 from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
@@ -103,6 +105,19 @@ class ProjectRuntime:
 
     def terminal_for(self, owner: str) -> PersistentTerminal:
         return self.terminals.get(owner)
+
+    def android_tools(self) -> AndroidTools:
+        return AndroidTools(self.guard, self.runner, self.root)
+
+    def github_client(self, *, token_env: str = "GITHUB_TOKEN") -> GitHubRESTClient:
+        if not self.config.repository:
+            raise ConfigurationError("Project has no GitHub repository configured")
+        return GitHubRESTClient(
+            self.guard,
+            str(self.root),
+            self.config.repository,
+            token_env=token_env,
+        )
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)
