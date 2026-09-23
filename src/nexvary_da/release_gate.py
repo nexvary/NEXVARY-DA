@@ -342,20 +342,39 @@ class ReleaseGate:
                 )
             )
 
-        has_navigation_surface = bool(list(self.root.rglob("*.html")))
+        has_navigation_surface = bool(list(self.root.rglob("*.html"))) or (
+            self.root / "src" / "nexvary_da" / "ui_app.py"
+        ).is_file()
         navigation_required = strict and policy.required("navigation", applicable=has_navigation_surface)
+        current_source_sha = source_manifest(self.root)["source_root_sha256"]
+        navigation_evidence = self.state.get_meta("last_navigation_probe")
+        if isinstance(navigation_evidence, dict):
+            nav_matches = navigation_evidence.get("source_root_sha256") == current_source_sha
+            nav_ready = navigation_evidence.get("ready") is True
+            route_count = len(navigation_evidence.get("routes") or [])
+            if nav_matches and nav_ready:
+                navigation_status = GateStatus.PASS
+                navigation_details = f"Navigation Integrity Probe passed; routes={route_count}"
+            elif nav_matches:
+                navigation_status = GateStatus.FAIL
+                navigation_details = "Navigation Integrity Probe found disconnected/broken UI routes"
+            else:
+                navigation_status = GateStatus.NOT_CONFIGURED if navigation_required else GateStatus.SKIP
+                navigation_details = "Navigation probe evidence is stale because the source fingerprint changed"
+        else:
+            navigation_status = GateStatus.NOT_CONFIGURED if navigation_required else GateStatus.SKIP
+            navigation_details = "Run the Navigation Integrity Probe to verify every registered UI route"
         steps.append(
             GateStep(
                 "navigation",
-                GateStatus.NOT_CONFIGURED if navigation_required else GateStatus.SKIP,
+                navigation_status,
                 navigation_required,
-                "Interactive navigation adapter is not yet configured",
+                navigation_details,
             )
         )
 
         ui_required = strict and policy.required("ui_gate", applicable=True)
         ui_evidence = self.state.get_meta("last_ui_probe")
-        current_source_sha = source_manifest(self.root)["source_root_sha256"]
         if isinstance(ui_evidence, dict):
             evidence_matches = ui_evidence.get("source_root_sha256") == current_source_sha
             evidence_ready = ui_evidence.get("ready") is True

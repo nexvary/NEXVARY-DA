@@ -17,7 +17,7 @@ class ReleasePolicy:
     dead_links: str = "auto"
     orphan_pages: str = "auto"
     broken_buttons: str = "auto"
-    navigation: str = "auto"
+    navigation: str = "required"
     ui_gate: str = "required"
     rtl: str = "auto"
     localization: str = "auto"
