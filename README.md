@@ -49,3 +49,12 @@ nexvary-da mcp /path/to/project
 Sensitive project permissions are explicit: `--allow-delete`, `--allow-network`, `--allow-git-commit`, `--allow-git-push`, `--allow-release`, `--allow-adb`, and `--allow-desktop-automation`.
 
 See `HYBRID_ARCHITECTURE.md`, `ARCHITECTURE.md`, `SECURITY_MODEL.md`, `RELEASE_GATE.md`, `ROADMAP.md`, and `WORK_PROJECT_STATE.md`.
+
+## Optional ZCode Agent Engine
+
+NEXVARY-DA supports the official ZCode CLI as a guarded planning engine. Select **Native**, **ZCode**, or **Hybrid** in the desktop UI, or use:
+
+    nexvary-da plan "your task" --path . --engine hybrid --mode engineer
+
+ZCode is forced into plan-only mode. NEXVARY remains the authority for file, shell, Git, build, ADB and release execution. Set `NEXVARY_DA_ZCODE_BIN` when the `zcode` executable is not already on `PATH`. See `ZCODE_INTEGRATION.md`.
+

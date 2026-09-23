@@ -20,6 +20,7 @@ from .state import ProjectState
 from .terminal import PersistentTerminal
 from .terminal_pool import TerminalPool
 from .validation_cache import ValidationCache
+from .zcode_adapter import ZCodeAdapter
 
 
 _CONFIG_DIR = ".nexvary-da"
@@ -118,6 +119,9 @@ class ProjectRuntime:
             self.config.repository,
             token_env=token_env,
         )
+
+    def zcode(self) -> ZCodeAdapter:
+        return ZCodeAdapter(self.guard, self.runner, self.state, self.root)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)

@@ -6,6 +6,7 @@ from dataclasses import asdict
 
 from .agents import AgentRole, BuilderAgent, QAAgent
 from .coordinator import DevelopmentCoordinator
+from .engine_router import AgentEngine, EngineRouter
 from .environment import discover_environment
 from .mcp_server import run_mcp
 from .modes import WorkMode
@@ -68,6 +69,21 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[mode.value for mode in WorkMode],
         default=WorkMode.ENGINEER.value,
     )
+
+    plan = sub.add_parser("plan", help="Plan a task with Native, ZCode, or Hybrid engine")
+    plan.add_argument("goal")
+    plan.add_argument("--path", default=".")
+    plan.add_argument(
+        "--engine",
+        choices=[engine.value for engine in AgentEngine],
+        default=AgentEngine.HYBRID.value,
+    )
+    plan.add_argument(
+        "--mode",
+        choices=[mode.value for mode in WorkMode],
+        default=WorkMode.ENGINEER.value,
+    )
+    plan.add_argument("--context", default="")
 
     for name, help_text in (
         ("status", "Show durable project state"),
@@ -156,9 +172,22 @@ def main(argv: list[str] | None = None) -> int:
                 "last_validation_gate": runtime.state.get_meta("last_validation_gate"),
                 "last_release_gate": runtime.state.get_meta("last_release_gate"),
                 "last_coordinator_run": runtime.state.get_meta("last_coordinator_run"),
+                "last_engine_plan": runtime.state.get_meta("last_engine_plan"),
+                "zcode": runtime.zcode().status(probe_version=False).to_dict(),
             }
             print(json.dumps(result, indent=2, ensure_ascii=False))
             return 0
+
+        if args.command == "plan":
+            report = EngineRouter(runtime).plan(
+                args.goal,
+                engine=AgentEngine(args.engine),
+                mode=WorkMode(args.mode),
+                context=args.context,
+            )
+            print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+            zcode = report.zcode
+            return 0 if zcode is None or zcode.get("success") is True else 2
 
         if args.command == "verify":
             report = DevelopmentCoordinator(runtime).run(WorkMode(args.mode))

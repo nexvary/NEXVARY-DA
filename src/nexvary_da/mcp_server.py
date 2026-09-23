@@ -8,6 +8,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 
 from .coordinator import DevelopmentCoordinator
+from .engine_router import AgentEngine, EngineRouter
 from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime
@@ -185,6 +186,26 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
             "workflow_runs": client.workflow_runs(branch=branch, per_page=10),
             "releases": client.releases(per_page=10),
         }
+
+    @mcp.tool()
+    def zcode_status(probe_version: bool = False) -> dict[str, Any]:
+        """Return ZCode adapter availability. No network call is performed."""
+        return service.runtime.zcode().status(probe_version=probe_version).to_dict()
+
+    @mcp.tool()
+    def engine_plan(
+        goal: str,
+        engine: str = "hybrid",
+        mode: str = "engineer",
+        context: str = "",
+    ) -> dict[str, Any]:
+        """Plan through Native/ZCode/Hybrid. ZCode is always forced into plan-only mode."""
+        return EngineRouter(service.runtime).plan(
+            goal,
+            engine=AgentEngine(engine),
+            mode=WorkMode(mode),
+            context=context,
+        ).to_dict()
 
     @mcp.tool()
     def git_status() -> dict[str, Any]:

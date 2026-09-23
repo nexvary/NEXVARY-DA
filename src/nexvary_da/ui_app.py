@@ -6,6 +6,7 @@ from pathlib import Path
 from .agents import AgentRole
 from .change_tracker import ProjectChangeTracker
 from .coordinator import DevelopmentCoordinator
+from .engine_router import AgentEngine, EngineRouter
 from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime
@@ -114,6 +115,24 @@ class DeveloperAgentUI:
             tk.Radiobutton(modes, text=mode.value.upper(), variable=self.mode, value=mode.value, indicatoron=False,
                            bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
                            padx=self.px(7), pady=self.px(5), font=(self.font, self.px(7), "bold")).pack(side="left", padx=1, pady=1)
+
+        engine_bar = tk.Frame(parent, bg=PALETTE.surface); engine_bar.pack(fill="x", padx=self.px(12), pady=(0,self.px(7)))
+        self.label(engine_bar, "AGENT ENGINE", size=7, fg=PALETTE.muted, bold=True).pack(side="left", padx=(0,self.px(8)))
+        self.engine = tk.StringVar(value=self.runtime.state.get_meta("ui.engine", AgentEngine.NATIVE.value))
+        if self.engine.get() not in {item.value for item in AgentEngine}: self.engine.set(AgentEngine.NATIVE.value)
+        engine_modes = tk.Frame(engine_bar, bg=PALETTE.surface_alt); engine_modes.pack(side="left")
+        for engine in AgentEngine:
+            tk.Radiobutton(engine_modes, text=engine.value.upper(), variable=self.engine, value=engine.value, indicatoron=False,
+                           bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
+                           padx=self.px(8), pady=self.px(5), font=(self.font, self.px(7), "bold")).pack(side="left", padx=1, pady=1)
+        zcode_status = self.runtime.zcode().status(probe_version=False)
+        self.zcode_status_var = tk.StringVar(value="ZCODE READY" if zcode_status.available else "ZCODE NOT INSTALLED")
+        self.zcode_status_label = tk.Label(engine_bar, textvariable=self.zcode_status_var, bg=PALETTE.surface,
+                                           fg=PALETTE.success if zcode_status.available else PALETTE.muted,
+                                           font=(self.font, self.px(7), "bold"))
+        self.zcode_status_label.pack(side="left", padx=self.px(9))
+        self.button(engine_bar, "PLAN TASK", self.plan_task, accent=True).pack(side="right")
+
         timeline = tk.Frame(parent, bg=PALETTE.surface_alt); timeline.pack(fill="x", padx=self.px(12), pady=(0,self.px(7)))
         self.timeline = {}
         for i, name in enumerate(("ANALYZE","PATCH","BUILD","TEST","INSPECT","READY")):
@@ -175,6 +194,47 @@ class DeveloperAgentUI:
                 self.window.after(0,lambda:(self.append(f"VERIFICATION ERROR • {type(exc).__name__}: {exc}"),self.set_status("ready","READY NO","BLOCKED"),self.run_button.configure(state="normal")))
         threading.Thread(target=worker,daemon=True).start()
 
+    def plan_task(self)->None:
+        from tkinter import simpledialog
+        goal = simpledialog.askstring(
+            "NEXVARY-DA Agent Plan",
+            "Task goal:",
+            parent=self.window,
+        )
+        if not goal or not goal.strip():
+            return
+        engine = AgentEngine(self.engine.get())
+        mode = WorkMode(self.mode.get())
+        self.runtime.state.set_meta("ui.engine", engine.value)
+        self.append(f"[{engine.value.upper()}] planning • {goal.strip()}")
+        def worker():
+            try:
+                report = EngineRouter(self.runtime).plan(goal, engine=engine, mode=mode)
+                def done():
+                    self.append(f"ENGINE • {report.engine.value.upper()} • execution authority=NEXVARY")
+                    self.append(f"NATIVE • {report.native['validation']['description']}")
+                    if report.zcode:
+                        if report.zcode.get("success"):
+                            plan = report.zcode.get("plan") or {}
+                            self.append(f"ZCODE PLAN • {plan.get('summary', '')}")
+                            for index, step in enumerate(plan.get("steps", [])[:40], 1):
+                                self.append(f"  {index:02d}. {step.get('action')} • {step.get('reason', '')}")
+                            self.zcode_status_var.set("ZCODE PLAN PASS")
+                            self.zcode_status_label.configure(fg=PALETTE.success)
+                        else:
+                            self.append(f"ZCODE PLAN FAILED • {report.zcode.get('error', '')}")
+                            self.zcode_status_var.set("ZCODE PLAN FAIL")
+                            self.zcode_status_label.configure(fg=PALETTE.danger)
+                self.window.after(0, done)
+            except Exception as exc:
+                def failed():
+                    self.append(f"ENGINE PLAN ERROR • {type(exc).__name__}: {exc}")
+                    if engine in {AgentEngine.ZCODE, AgentEngine.HYBRID}:
+                        self.zcode_status_var.set("ZCODE BLOCKED")
+                        self.zcode_status_label.configure(fg=PALETTE.danger)
+                self.window.after(0, failed)
+        threading.Thread(target=worker, daemon=True).start()
+
     def add_project(self)->None:
         def imported(p):
             self.plist.insert("end",f"●  {p.name}"); self.append(f"PROJECT READY • {p.path} • {'reused' if p.reused_existing_clone else 'cloned'} • {p.project_kind}")
@@ -195,4 +255,4 @@ class DeveloperAgentUI:
         if isinstance(last,dict) and last.get("complete"): self.set_status("ready","READY YES","READY")
 
     def close(self)->None:
-        self.runtime.state.set_meta("ui.geometry",self.window.geometry()); self.runtime.state.set_meta("ui.mode",self.mode.get()); self.runtime.close(); self.window.destroy()
+        self.runtime.state.set_meta("ui.geometry",self.window.geometry()); self.runtime.state.set_meta("ui.mode",self.mode.get()); self.runtime.state.set_meta("ui.engine",self.engine.get()); self.runtime.close(); self.window.destroy()
