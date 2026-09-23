@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install package and build tooling
-        run: python -m pip install --disable-pip-version-check -e . build
+        run: python -m pip install --disable-pip-version-check -e ".[ui-test]" build
 
       - name: Compile
         run: python -m compileall -q src tests
@@ -40,6 +40,27 @@ jobs:
 
       - name: Diff check
         run: git diff --check
+
+      - name: Install Xvfb for runtime UI probe
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y xvfb
+
+      - name: Runtime UI probe with screenshot
+        if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" python tests/ui_probe_smoke.py --screenshot-output ui-probe.png --require-screenshot
+
+      - name: Runtime UI probe
+        if: runner.os == 'Windows'
+        run: python tests/ui_probe_smoke.py
+
+      - name: Upload UI probe screenshot
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v6
+        with:
+          name: nexvary-da-ui-probe-${{ runner.os }}
+          path: ui-probe.png
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Build wheel and source distribution
         run: python -m build

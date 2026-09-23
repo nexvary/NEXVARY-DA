@@ -16,6 +16,7 @@ from .project import ProjectRuntime, init_project
 from .project_import import ProjectImporter
 from .provenance import build_provenance, write_provenance
 from .ui import launch_ui
+from .ui_probe import run_runtime_ui_probe
 
 
 def _permission_flags(parser: argparse.ArgumentParser) -> None:
@@ -100,6 +101,13 @@ def build_parser() -> argparse.ArgumentParser:
     provenance.add_argument("path", nargs="?", default=".")
     provenance.add_argument("--write", action="store_true")
 
+    ui_probe = sub.add_parser("ui-probe", help="Run runtime desktop UI geometry/interaction probe")
+    ui_probe.add_argument("path", nargs="?", default=".")
+    ui_probe.add_argument("--width", type=int, default=1600)
+    ui_probe.add_argument("--height", type=int, default=900)
+    ui_probe.add_argument("--screenshot", default="")
+    ui_probe.add_argument("--require-screenshot", action="store_true")
+
     for name, help_text in (
         ("status", "Show durable project state"),
         ("doctor", "Run non-destructive project diagnostics"),
@@ -182,6 +190,19 @@ def main(argv: list[str] | None = None) -> int:
                 payload["written_to"] = str(path.relative_to(runtime.root))
             print(json.dumps(payload, indent=2, ensure_ascii=False))
             return 0
+
+        if args.command == "ui-probe":
+            runtime.close()
+            runtime = None
+            report = run_runtime_ui_probe(
+                args.path,
+                width=args.width,
+                height=args.height,
+                screenshot=args.screenshot or None,
+                require_screenshot=args.require_screenshot,
+            )
+            print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
+            return 0 if report.ready else 2
 
         if args.command == "status":
             if Permission.SHELL in runtime.config.permissions:
@@ -301,5 +322,6 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"[exit {result.returncode}]")
             return 0
     finally:
-        runtime.close()
+        if runtime is not None:
+            runtime.close()
     return 1

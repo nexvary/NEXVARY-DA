@@ -52,10 +52,12 @@ class DeveloperAgentUI:
         return self.tk.Label(parent, text=text, bg=bg or parent.cget("bg"), fg=fg or PALETTE.text,
                              font=(self.font, self.px(size), "bold" if bold else "normal"))
 
-    def button(self, parent, text: str, command, *, accent=False):
-        return self.tk.Button(parent, text=text, command=command, bg=PALETTE.gold if accent else PALETTE.surface_alt,
-                              fg=PALETTE.background if accent else PALETTE.text, relief="flat", bd=0, cursor="hand2",
-                              padx=self.px(10), pady=self.px(6), font=(self.font, self.px(8), "bold"))
+    def button(self, parent, text: str, command, *, accent=False, probe_safe=False):
+        widget = self.tk.Button(parent, text=text, command=command, bg=PALETTE.gold if accent else PALETTE.surface_alt,
+                                fg=PALETTE.background if accent else PALETTE.text, relief="flat", bd=0, cursor="hand2",
+                                padx=self.px(10), pady=self.px(6), font=(self.font, self.px(8), "bold"))
+        widget._nexvary_probe_safe = bool(probe_safe)
+        return widget
 
     def card(self, parent, bg=None):
         return self.tk.Frame(parent, bg=bg or PALETTE.surface, highlightbackground=PALETTE.border,
@@ -112,9 +114,11 @@ class DeveloperAgentUI:
         if self.mode.get() not in {m.value for m in WorkMode}: self.mode.set(WorkMode.ENGINEER.value)
         modes = tk.Frame(bar, bg=PALETTE.surface_alt); modes.pack(side="right")
         for mode in WorkMode:
-            tk.Radiobutton(modes, text=mode.value.upper(), variable=self.mode, value=mode.value, indicatoron=False,
-                           bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
-                           padx=self.px(7), pady=self.px(5), font=(self.font, self.px(7), "bold")).pack(side="left", padx=1, pady=1)
+            control = tk.Radiobutton(modes, text=mode.value.upper(), variable=self.mode, value=mode.value, indicatoron=False,
+                                     bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
+                                     padx=self.px(7), pady=self.px(5), font=(self.font, self.px(7), "bold"))
+            control._nexvary_probe_safe = True
+            control.pack(side="left", padx=1, pady=1)
 
         engine_bar = tk.Frame(parent, bg=PALETTE.surface); engine_bar.pack(fill="x", padx=self.px(12), pady=(0,self.px(7)))
         self.label(engine_bar, "AGENT ENGINE", size=7, fg=PALETTE.muted, bold=True).pack(side="left", padx=(0,self.px(8)))
@@ -122,9 +126,11 @@ class DeveloperAgentUI:
         if self.engine.get() not in {item.value for item in AgentEngine}: self.engine.set(AgentEngine.NATIVE.value)
         engine_modes = tk.Frame(engine_bar, bg=PALETTE.surface_alt); engine_modes.pack(side="left")
         for engine in AgentEngine:
-            tk.Radiobutton(engine_modes, text=engine.value.upper(), variable=self.engine, value=engine.value, indicatoron=False,
-                           bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
-                           padx=self.px(8), pady=self.px(5), font=(self.font, self.px(7), "bold")).pack(side="left", padx=1, pady=1)
+            control = tk.Radiobutton(engine_modes, text=engine.value.upper(), variable=self.engine, value=engine.value, indicatoron=False,
+                                     bg=PALETTE.surface_alt, fg=PALETTE.text, selectcolor=PALETTE.blue, relief="flat", bd=0,
+                                     padx=self.px(8), pady=self.px(5), font=(self.font, self.px(7), "bold"))
+            control._nexvary_probe_safe = True
+            control.pack(side="left", padx=1, pady=1)
         zcode_status = self.runtime.zcode().status(probe_version=False)
         self.zcode_status_var = tk.StringVar(value="ZCODE READY" if zcode_status.available else "ZCODE NOT INSTALLED")
         self.zcode_status_label = tk.Label(engine_bar, textvariable=self.zcode_status_var, bg=PALETTE.surface,
@@ -145,7 +151,7 @@ class DeveloperAgentUI:
             self.label(c,title,size=7,fg=PALETTE.muted,bg=PALETTE.surface_alt).pack(anchor="w",padx=self.px(8),pady=(self.px(6),0))
             tk.Label(c,textvariable=self.summary[key],bg=PALETTE.surface_alt,fg=PALETTE.text,font=(self.font,self.px(12),"bold")).pack(anchor="w",padx=self.px(8),pady=(0,self.px(6)))
         head=tk.Frame(parent,bg=PALETTE.surface); head.pack(fill="x",padx=self.px(12)); self.label(head,"ACTIVITY / EVIDENCE",fg=PALETTE.gold,bold=True).pack(side="left")
-        self.button(head,"CLEAR",self.clear_log).pack(side="right")
+        self.button(head,"CLEAR",self.clear_log,probe_safe=True).pack(side="right")
         self.log=tk.Text(parent,bg=PALETTE.terminal,fg=PALETTE.text,insertbackground=PALETTE.gold,relief="flat",bd=0,wrap="word",state="disabled",font=(self.mono,self.px(8)))
         self.log.pack(fill="both",expand=True,padx=self.px(12),pady=(self.px(4),self.px(8)))
         self.run_button=self.button(parent,"RUN VERIFICATION",self.run_verification,accent=True); self.run_button.pack(anchor="e",padx=self.px(12),pady=(0,self.px(10)))

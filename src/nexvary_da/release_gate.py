@@ -12,6 +12,7 @@ from .android_qa import audit_android_project
 from .build_profiles import profile_for
 from .environment import detect_project_kind
 from .process import ProcessRunner
+from .provenance import source_manifest
 from .release_policy import load_release_policy
 from .source_audit import audit_python_sources
 from .state import ProjectState
@@ -353,12 +354,34 @@ class ReleaseGate:
         )
 
         ui_required = strict and policy.required("ui_gate", applicable=True)
+        ui_evidence = self.state.get_meta("last_ui_probe")
+        current_source_sha = source_manifest(self.root)["source_root_sha256"]
+        if isinstance(ui_evidence, dict):
+            evidence_matches = ui_evidence.get("source_root_sha256") == current_source_sha
+            evidence_ready = ui_evidence.get("ready") is True
+            if evidence_matches and evidence_ready:
+                ui_status = GateStatus.PASS
+                ui_details = (
+                    f"Runtime UI probe passed for current source; "
+                    f"widgets={ui_evidence.get('widget_count')}; "
+                    f"interactive={ui_evidence.get('interactive_count')}; "
+                    f"screenshot={bool((ui_evidence.get('screenshot') or {}).get('captured'))}"
+                )
+            elif evidence_matches and not evidence_ready:
+                ui_status = GateStatus.FAIL
+                ui_details = "Runtime UI probe ran for current source but reported blocking issues"
+            else:
+                ui_status = GateStatus.NOT_CONFIGURED if ui_required else GateStatus.SKIP
+                ui_details = "UI probe evidence is stale because the source fingerprint changed"
+        else:
+            ui_status = GateStatus.NOT_CONFIGURED if ui_required else GateStatus.SKIP
+            ui_details = "Run nexvary-da ui-probe to produce runtime UI evidence"
         steps.append(
             GateStep(
                 "ui_gate",
-                GateStatus.NOT_CONFIGURED if ui_required else GateStatus.SKIP,
+                ui_status,
                 ui_required,
-                "Runtime screenshot/interaction UI adapter is not yet configured",
+                ui_details,
             )
         )
         steps.extend(self._artifact_steps(strict=strict))

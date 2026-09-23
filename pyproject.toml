@@ -12,6 +12,9 @@ license = { text = "MIT" }
 authors = [{ name = "NEXVARY" }]
 dependencies = ["mcp>=2,<3"]
 
+[project.optional-dependencies]
+ui-test = ["Pillow>=10,<13"]
+
 [project.scripts]
 nexvary-da = "nexvary_da.cli:main"
 
