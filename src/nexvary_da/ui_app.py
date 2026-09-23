@@ -164,7 +164,14 @@ class DeveloperAgentUI:
             x=self.label(c,"IDLE",size=7,fg=PALETTE.muted,bg=PALETTE.surface_alt); x.pack(anchor="w",padx=self.px(8),pady=(0,self.px(5))); self.agent_labels[role]=x
         p=self.card(parent,PALETTE.surface_alt); p.pack(fill="x",padx=self.px(9),pady=self.px(8)); self.label(p,"PERMISSION LAYER",size=8,fg=PALETTE.gold,bold=True,bg=PALETTE.surface_alt).pack(anchor="w",padx=self.px(8),pady=(self.px(6),0))
         self.label(p,f"{len(self.runtime.config.permissions)}/{len(Permission)} capabilities granted",size=7,fg=PALETTE.muted,bg=PALETTE.surface_alt).pack(anchor="w",padx=self.px(8),pady=(0,self.px(6)))
-        self.refresh_agents()
+        fabric=self.card(parent,PALETTE.surface_alt); fabric.pack(fill="x",padx=self.px(9),pady=(0,self.px(8)))
+        self.label(fabric,"AUTOMATION FABRIC",size=8,fg=PALETTE.gold,bold=True,bg=PALETTE.surface_alt).pack(anchor="w",padx=self.px(8),pady=(self.px(6),0))
+        self.integration_var=self.tk.StringVar(value="SCANNING")
+        self.integration_label=self.label(fabric,"",size=7,fg=PALETTE.muted,bg=PALETTE.surface_alt)
+        self.integration_label.configure(textvariable=self.integration_var)
+        self.integration_label.pack(anchor="w",padx=self.px(8),pady=(0,self.px(3)))
+        self.button(fabric,"REFRESH PLUGINS",self.refresh_integrations,probe_safe=True).pack(fill="x",padx=self.px(8),pady=(0,self.px(7)))
+        self.refresh_agents(); self.refresh_integrations()
 
     def append(self,text:str)->None:
         self.log.configure(state="normal"); self.log.insert("end",text.rstrip()+"\n"); self.log.see("end"); self.log.configure(state="disabled")
@@ -178,6 +185,14 @@ class DeveloperAgentUI:
         for role,x in self.agent_labels.items():
             worker=snap.get(role); state=worker.status if worker else "IDLE"; task=(worker.last_task or "") if worker else ""
             x.configure(text=state if not task else f"{state} • {task[:30]}",fg=status_color(state))
+
+    def refresh_integrations(self)->None:
+        statuses=self.runtime.plugins().all_statuses()
+        ready=sum(1 for item in statuses if item.ready)
+        desktop=next((item.ready for item in statuses if item.plugin_id=="cua-driver"),False)
+        browser=next((item.ready for item in statuses if item.plugin_id=="oya-browser"),False)
+        self.integration_var.set(f"{ready}/{len(statuses)} ready • Desktop {'ON' if desktop else '—'} • Browser {'ON' if browser else '—'}")
+        self.integration_label.configure(fg=PALETTE.success if ready else PALETTE.muted)
 
     def run_verification(self)->None:
         self.run_button.configure(state="disabled"); selected=WorkMode(self.mode.get()); self.summary["mode"].set(selected.value.upper())

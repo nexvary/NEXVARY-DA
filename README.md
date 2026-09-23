@@ -71,3 +71,22 @@ nexvary-da signing-status .
 ```
 
 The CI pipeline builds and smoke-tests a one-file native executable on Windows and Linux, an NSIS Windows Setup, a Debian package, and portable bundles. Production code signing is deliberately separate: real organization-controlled signing credentials are required and are never generated or committed by NEXVARY-DA.
+
+
+## Optional automation and media fabric
+
+Stages 301-350 add a guarded plugin/integration layer for FastMCP, Cua Driver, the MIT-licensed Oya SDK/CLI surface, VoiceStudio as an external service, Qwen-Image 2.1 as an optional separately licensed model runtime, and MoneyPrinterTurbo as a workspace-contained external checkout.
+
+Useful commands:
+
+    nexvary-da integrations .
+    nexvary-da cua-call list_apps --path .
+    nexvary-da fastmcp-run server.py:mcp --path .
+    nexvary-da oya-task https://example.com "Inspect this page" --path . --playbook inspect-page
+    nexvary-da voicestudio-health .
+    nexvary-da qwen-image "A technical diagram" --path . --output .nexvary-da/media/diagram.png
+    nexvary-da moneyprinter-video "A short engineering explainer" --path .
+
+No external project is auto-installed or silently downloaded. Cua mutation requires Desktop Automation plus explicit mutation approval. Oya browser credentials/personas remain outside NEXVARY state. Qwen-Image 2.1 weights are not bundled; the reviewed upstream Research License is non-commercial by default, so commercial use requires a separate upstream license.
+
+See INTEGRATIONS.md and STAGES_301_350.md.

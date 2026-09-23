@@ -119,6 +119,45 @@ def build_parser() -> argparse.ArgumentParser:
     signing = sub.add_parser("signing-status", help="Show production code-signing readiness")
     signing.add_argument("path", nargs="?", default=".")
 
+    integrations = sub.add_parser("integrations", help="Show optional automation/media integration readiness")
+    integrations.add_argument("path", nargs="?", default=".")
+
+    fastmcp = sub.add_parser("fastmcp-run", help="Start an approved FastMCP server")
+    fastmcp.add_argument("target")
+    fastmcp.add_argument("--path", default=".")
+    fastmcp.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    fastmcp.add_argument("--host", default="127.0.0.1")
+    fastmcp.add_argument("--port", type=int, default=8000)
+    fastmcp.add_argument("--allow-remote-bind", action="store_true")
+
+    cua = sub.add_parser("cua-call", help="Call an allowlisted Cua Driver tool")
+    cua.add_argument("tool")
+    cua.add_argument("--path", default=".")
+    cua.add_argument("--args", default="{}")
+    cua.add_argument("--allow-mutation", action="store_true")
+
+    oya = sub.add_parser("oya-task", help="Run an Oya Browser task and optionally record a playbook")
+    oya.add_argument("url")
+    oya.add_argument("instruction")
+    oya.add_argument("--path", default=".")
+    oya.add_argument("--playbook", default="")
+    oya.add_argument("--data", default="{}")
+
+    voice = sub.add_parser("voicestudio-health", help="Probe the configured VoiceStudio API")
+    voice.add_argument("path", nargs="?", default=".")
+
+    qwen = sub.add_parser("qwen-image", help="Generate one image using an installed Qwen-Image 2.1 runtime")
+    qwen.add_argument("prompt")
+    qwen.add_argument("--path", default=".")
+    qwen.add_argument("--output", default=".nexvary-da/media/qwen-image.png")
+    qwen.add_argument("--model", default="Qwen/Qwen-Image-2.1")
+    qwen.add_argument("--device", default="cuda")
+    qwen.add_argument("--local-files-only", action="store_true")
+
+    mpt = sub.add_parser("moneyprinter-video", help="Run a configured MoneyPrinterTurbo video job")
+    mpt.add_argument("subject")
+    mpt.add_argument("--path", default=".")
+
     for name, help_text in (
         ("status", "Show durable project state"),
         ("doctor", "Run non-destructive project diagnostics"),
@@ -236,6 +275,69 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
             return 0 if payload["ready"] else 2
 
+        if args.command == "integrations":
+            payload = runtime.plugins().snapshot()
+            payload["custom_manifests"] = runtime.plugins().load_custom_manifests()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "fastmcp-run":
+            payload = runtime.fastmcp_gateway().start(
+                args.target,
+                transport=args.transport,
+                host=args.host,
+                port=args.port,
+                allow_remote_bind=args.allow_remote_bind,
+            )
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "cua-call":
+            arguments = json.loads(args.args)
+            if not isinstance(arguments, dict):
+                raise ValueError("--args must decode to a JSON object")
+            payload = runtime.cua_driver().call(
+                args.tool,
+                arguments,
+                allow_mutation=args.allow_mutation,
+            )
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload["returncode"] == 0 else 2
+
+        if args.command == "oya-task":
+            data = json.loads(args.data)
+            if not isinstance(data, dict):
+                raise ValueError("--data must decode to a JSON object")
+            payload = runtime.oya_browser().ask_and_record(
+                args.url,
+                args.instruction,
+                playbook=args.playbook,
+                data=data,
+            )
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload["returncode"] == 0 else 2
+
+        if args.command == "voicestudio-health":
+            payload = runtime.voicestudio().health()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "qwen-image":
+            payload = runtime.qwen_image().generate(
+                args.prompt,
+                args.output,
+                model=args.model,
+                device=args.device,
+                local_files_only=args.local_files_only,
+            )
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload["returncode"] == 0 else 2
+
+        if args.command == "moneyprinter-video":
+            payload = runtime.moneyprinter().generate(args.subject)
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload["returncode"] == 0 else 2
+
         if args.command == "status":
             if Permission.SHELL in runtime.config.permissions:
                 branch = runtime.git.branch()
@@ -265,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
                 "last_coordinator_run": runtime.state.get_meta("last_coordinator_run"),
                 "last_engine_plan": runtime.state.get_meta("last_engine_plan"),
                 "zcode": runtime.zcode().status(probe_version=False).to_dict(),
+                "integrations": runtime.plugins().snapshot(),
             }
             print(json.dumps(result, indent=2, ensure_ascii=False))
             return 0

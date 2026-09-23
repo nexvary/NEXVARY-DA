@@ -31,3 +31,15 @@ The CI/release toolchain may use the following external projects:
 - Pillow — https://python-pillow.org/ — HPND license; used by the optional runtime screenshot QA path.
 
 These tools are not copied into the NEXVARY-DA source tree as vendored projects. Native build outputs can contain the runtime/bootstrap components normally produced by those tools under their respective redistribution terms.
+
+
+## Optional Stage 350 integrations
+
+These projects are interoperated with as separately installed tools/services. NEXVARY-DA does not vendor their source or model weights in this integration.
+
+- FastMCP — https://github.com/PrefectHQ/fastmcp — Apache-2.0.
+- Cua Driver — https://github.com/trycua/cua — MIT.
+- Oya Browser — https://github.com/OyadotAI/oya-browser — NEXVARY targets packages/sdk and packages/cli, which upstream LICENSE.md identifies as MIT. Other repository content is under separate Sustainable Use terms and is not copied by this integration.
+- VoiceStudio — https://github.com/debpalash/VoiceStudio — AGPL-3.0-only. NEXVARY uses external API interoperability and does not vendor VoiceStudio.
+- Qwen-Image 2.1 — https://github.com/QwenLM/Qwen-Image-2.1 — Qwen Research License Agreement. The reviewed upstream license limits the model materials to non-commercial use unless a separate commercial license is obtained. NEXVARY does not bundle the model weights.
+- MoneyPrinterTurbo — https://github.com/harry0703/MoneyPrinterTurbo — MIT. NEXVARY invokes a separately installed workspace checkout.

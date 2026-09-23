@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 300
+- Current milestone candidate: Stage 350
 
 ## Verified baseline before Stage 300
 
@@ -49,3 +49,22 @@ Stage 251–275 introduced the runtime UI probe and actual Linux/Xvfb screenshot
 ## Completion rule
 
 The Stage 300 candidate becomes the verified baseline only after the exact branch head passes both Ubuntu and Windows CI, including native executable/package checks. Any credential-dependent signing step remains explicitly unverified until genuine credentials are supplied.
+
+
+## Verified Stage 300 baseline
+
+The Stage 300 baseline was verified at commit fed16db221c4c2b72c4be9df1a76940402419fa1 with Core CI Run #30 succeeding after native NSIS/packaging fixes.
+
+## Stage 301-350 candidate capabilities
+
+- Optional Plugin Hub with six built-in integration families and status-only custom manifests.
+- FastMCP server launcher through the managed process registry.
+- Cua Driver computer-use adapter with read-only/mutating allowlists and explicit mutation approval.
+- Oya Browser SDK bridge for explicit tasks and playbook recording without copying browser credentials.
+- VoiceStudio loopback/HTTPS service adapter.
+- Qwen-Image 2.1 external runtime adapter with non-commercial license boundary surfaced.
+- MoneyPrinterTurbo workspace-contained CLI video adapter.
+- CLI, MCP, and desktop UI integration readiness surfaces.
+- No external project is auto-installed, auto-downloaded, or granted permissions by discovery.
+
+Stage 350 is accepted only after the exact candidate head passes Windows and Ubuntu CI, including the Stage 300 native packaging checks.

@@ -10,6 +10,11 @@ from .agents import AgentPool
 from .checkpoint import CheckpointStore
 from .android_profile import AndroidTools
 from .android_ui import AndroidUIHarness
+from .cua_adapter import CuaDriverAdapter
+from .fastmcp_gateway import FastMCPGateway
+from .media_adapters import MoneyPrinterTurboAdapter, QwenImageAdapter, VoiceStudioAdapter
+from .oya_adapter import OyaBrowserAdapter
+from .plugin_hub import PluginHub
 from .errors import ConfigurationError
 from .file_tools import FileTools
 from .github_client import GitHubRESTClient
@@ -134,6 +139,33 @@ class ProjectRuntime:
 
     def checkpoints(self) -> CheckpointStore:
         return CheckpointStore(self)
+
+    def plugins(self) -> PluginHub:
+        return PluginHub(self.guard, self.state, self.root)
+
+    def fastmcp_gateway(self) -> FastMCPGateway:
+        return FastMCPGateway(
+            self.guard,
+            self.runner,
+            self.processes,
+            self.state,
+            self.root,
+        )
+
+    def cua_driver(self) -> CuaDriverAdapter:
+        return CuaDriverAdapter(self.guard, self.runner, self.state, self.root)
+
+    def oya_browser(self) -> OyaBrowserAdapter:
+        return OyaBrowserAdapter(self.guard, self.runner, self.state, self.root)
+
+    def voicestudio(self) -> VoiceStudioAdapter:
+        return VoiceStudioAdapter(self.guard, self.state, self.root)
+
+    def qwen_image(self) -> QwenImageAdapter:
+        return QwenImageAdapter(self.guard, self.runner, self.state, self.root)
+
+    def moneyprinter(self) -> MoneyPrinterTurboAdapter:
+        return MoneyPrinterTurboAdapter(self.guard, self.runner, self.state, self.root)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)

@@ -301,6 +301,110 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
         return inspect_signing_readiness().to_dict()
 
     @mcp.tool()
+    def integration_status() -> dict[str, Any]:
+        """Return readiness for optional FastMCP/Cua/Oya/media integrations."""
+        payload = service.runtime.plugins().snapshot()
+        payload["custom_manifests"] = service.runtime.plugins().load_custom_manifests()
+        return payload
+
+    @mcp.tool()
+    def fastmcp_start(
+        target: str,
+        transport: str = "stdio",
+        host: str = "127.0.0.1",
+        port: int = 8000,
+        allow_remote_bind: bool = False,
+    ) -> dict[str, Any]:
+        """Start a workspace-bound FastMCP server through the managed process registry."""
+        return service.runtime.fastmcp_gateway().start(
+            target,
+            transport=transport,
+            host=host,
+            port=port,
+            allow_remote_bind=allow_remote_bind,
+        )
+
+    @mcp.tool()
+    def cua_driver_status(probe_version: bool = False) -> dict[str, Any]:
+        """Return local Cua Driver availability."""
+        return service.runtime.cua_driver().status(probe_version=probe_version).to_dict()
+
+    @mcp.tool()
+    def cua_driver_call(
+        tool: str,
+        arguments: dict[str, Any] | None = None,
+        allow_mutation: bool = False,
+    ) -> dict[str, Any]:
+        """Call an allowlisted Cua tool. GUI mutation requires explicit allow_mutation."""
+        return service.runtime.cua_driver().call(
+            tool,
+            arguments or {},
+            allow_mutation=allow_mutation,
+        )
+
+    @mcp.tool()
+    def oya_browser_status() -> dict[str, Any]:
+        """Return Oya SDK/browser readiness without exposing OYA_API_KEY."""
+        return service.runtime.oya_browser().status().to_dict()
+
+    @mcp.tool()
+    def oya_browser_task(
+        url: str,
+        instruction: str,
+        playbook: str = "",
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Run an explicit Oya browser task and optionally save a playbook."""
+        return service.runtime.oya_browser().ask_and_record(
+            url,
+            instruction,
+            playbook=playbook,
+            data=data or {},
+        )
+
+    @mcp.tool()
+    def voicestudio_status() -> dict[str, Any]:
+        """Return configured VoiceStudio endpoint without probing it."""
+        return service.runtime.voicestudio().status().to_dict()
+
+    @mcp.tool()
+    def voicestudio_health() -> dict[str, Any]:
+        """Probe the configured VoiceStudio /system/info endpoint."""
+        return service.runtime.voicestudio().health()
+
+    @mcp.tool()
+    def qwen_image_status() -> dict[str, Any]:
+        """Return local Qwen-Image runtime and license readiness."""
+        return service.runtime.qwen_image().status().to_dict()
+
+    @mcp.tool()
+    def qwen_image_generate(
+        prompt: str,
+        output: str = ".nexvary-da/media/qwen-image.png",
+        model: str = "Qwen/Qwen-Image-2.1",
+        device: str = "cuda",
+        local_files_only: bool = False,
+    ) -> dict[str, Any]:
+        """Generate an image using a separately installed Qwen-Image 2.1 runtime."""
+        return service.runtime.qwen_image().generate(
+            prompt,
+            output,
+            model=model,
+            device=device,
+            local_files_only=local_files_only,
+        )
+
+    @mcp.tool()
+    def moneyprinter_status() -> dict[str, Any]:
+        """Return configured MoneyPrinterTurbo checkout readiness."""
+        return service.runtime.moneyprinter().status().to_dict()
+
+    @mcp.tool()
+    def moneyprinter_video(subject: str) -> dict[str, Any]:
+        """Run a MoneyPrinterTurbo CLI video job inside the approved workspace."""
+        return service.runtime.moneyprinter().generate(subject)
+
+    @mcp.tool()
     def git_status() -> dict[str, Any]:
         """Return branch, commit, changes and porcelain status."""
         service._require(Permission.SHELL)
