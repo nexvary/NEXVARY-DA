@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 425
+- Current milestone candidate: Stage 460
 
 ## Verified baseline before Stage 300
 
@@ -91,3 +91,12 @@ The candidate is accepted only after the exact Stage 400 head passes Windows and
 - Easy Mode cards use distinct cyan/blue/purple/magenta/orange/gold accents.
 - Setup Center and Tool Box share the same visual system.
 - Acceptance still requires runtime UI probe, screenshot evidence, Windows CI/installer smoke, and Ubuntu/Debian smoke.
+
+
+## Stage 426-460 information/security/navigation candidate
+
+- About / عنا page with official NEXVARY social channels.
+- System Overview / حول النظام page documenting all major platform capabilities and verification boundaries.
+- Dedicated Navigation Integrity Probe opens every registered window, integration page, Tool Box category, and Add Project dialog.
+- Strict Release Gate requires current navigation evidence for the NEXVARY desktop UI.
+- CI adds dependency vulnerability auditing with pip-audit while retaining source/secret/workspace/UI/package checks.
