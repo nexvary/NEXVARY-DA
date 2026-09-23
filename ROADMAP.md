@@ -1,43 +1,37 @@
 # NEXVARY-DA Roadmap
 
-## v0.1 Core — implemented / being hardened
+## Stage 180 hybrid core — implemented / hardening
 
-- Approved workspace roots and independent capabilities.
-- Read/write/delete/shell/network/git-commit/git-push/release/ADB/desktop-control permission model.
-- SQLite state and reusable Agent Pool.
-- Persistent per-Agent terminal pool.
-- File/process/Git tools.
-- Environment discovery.
-- Builder and QA adapters.
-- Goal / Definition-of-Done engine.
-- Fast, Engineer and strict Release modes.
-- Project-bound MCP server.
-- Cloud Intelligence provider boundary; no mandatory local LLM.
-- Add Project from GitHub backend with existing-clone reuse and local project catalog.
-- Strict Release Gate with artifact discovery and SHA-256 evidence.
-- Minimal desktop UI with work-mode selector and Add Project from GitHub.
-- Windows/Ubuntu CI and package artifacts.
+- Approved workspace roots and independent read/write/delete/shell/network/git-commit/git-push/release/ADB/desktop-control capabilities.
+- SQLite durable state, reusable Agent Pool and per-Agent persistent terminals.
+- File/process/Git tools, cancellable process registry and environment discovery.
+- Fast, Engineer and strict Release modes with Definition-of-Done evidence.
+- Validation cache, file-change tracking and targeted test-selection planning.
+- Python, Gradle, Node and CMake profiles.
+- Hybrid Cloud Intelligence boundary with HTTPS provider configuration and environment-only credentials.
+- Strict JSON plan parser and approved local ToolKernel execution.
+- Add Project from GitHub with existing-clone reuse.
+- Direct GitHub PR/Actions/artifact/release REST integration.
+- Android SDK/Gradle/ADB profile.
+- Static QA for source hazards, local links, HTML route orphans, Tk buttons, localization and RTL signals.
+- Workspace health and artifact SHA-256 manifest evidence.
+- Project-bound MCP including process/event/Android/GitHub operational surfaces.
+- Dark/Gold/Blue QHD-aware desktop engineering-control shell.
+- Windows/Ubuntu CI and Python package artifacts.
 
-## Next hardening
+## Next hardening after Stage 180
 
-- Concrete cloud-provider adapters and secure credential configuration.
-- Cloud/tool orchestration loop that converts plans into approved local tool calls.
-- Validation cache keyed by commit/change set/toolchain.
-- File watcher and changed-file event stream.
-- Targeted test selection for Gradle/Python/Node/CMake.
-- Explicit Node/CMake build profiles.
-- Android SDK/Gradle/ADB project profile.
-- Process registry with attach/cancel/output retention.
-- Direct GitHub API integration for PRs, Actions logs, artifacts and releases.
+- Runtime screenshot capture and computer-vision/UI geometry gate.
+- Interactive desktop and Android navigation/button testing.
+- Android emulator/device lab orchestration and screenshot baselines.
+- Rich GitHub Actions log/artifact download and controlled release publication.
+- Signed Windows installer and Linux package pipeline.
+- Project-specific static analyzers (Ruff/Pyright/ESLint/Android Lint/CMake tooling) when configured.
+- Secret-provider integration suitable for OS credential vaults.
 
-## Heavy QA
+## External decision required before production cloud reasoning
 
-- Android/desktop screenshot adapters.
-- Broken-button and navigation automation.
-- RTL and localization completeness.
-- UI overflow and missing-resource checks.
-- Dead-link and orphan-route analysis.
-- Signed installer/release validation.
+A production cloud provider, model, API credential and cost/usage policy must be selected by the user or organization. The code supports a provider-neutral OpenAI-compatible boundary, but NEXVARY-DA does not silently choose a paid provider or persist API keys.
 
 ## Later
 

@@ -174,24 +174,25 @@ class ReleaseGate:
                 ]
             )
         elif kind == "node":
-            steps.append(self._cmd("unit_tests", ["npm", "test"]))
-            steps.append(
-                GateStep(
-                    "build",
-                    GateStatus.NOT_CONFIGURED,
-                    True,
-                    "Explicit Node build profile required",
-                )
-            )
+            profile = profile_for(self.root)
+            if profile is None:
+                steps.append(GateStep("build", GateStatus.NOT_CONFIGURED, True, "Node build profile unavailable"))
+            else:
+                steps.append(self._cmd("build", list(profile.build_command)))
+                if profile.test_command is not None:
+                    steps.append(self._cmd("unit_tests", list(profile.test_command)))
+                else:
+                    steps.append(GateStep("unit_tests", GateStatus.NOT_CONFIGURED, True, "Node test command unavailable"))
         elif kind == "cmake":
-            steps.append(
-                GateStep(
-                    "cmake_build",
-                    GateStatus.NOT_CONFIGURED,
-                    True,
-                    "Explicit CMake build profile required",
-                )
-            )
+            if not (self.root / "build" / "CMakeCache.txt").exists():
+                steps.append(self._cmd("cmake_configure", ["cmake", "-S", ".", "-B", "build"]))
+            profile = profile_for(self.root)
+            if profile is None:
+                steps.append(GateStep("cmake_build", GateStatus.NOT_CONFIGURED, True, "CMake build profile unavailable"))
+            else:
+                steps.append(self._cmd("cmake_build", list(profile.build_command)))
+                if profile.test_command is not None:
+                    steps.append(self._cmd("unit_tests", list(profile.test_command)))
         else:
             steps.append(
                 GateStep(
@@ -226,26 +227,107 @@ class ReleaseGate:
                 )
             )
 
-        strict_checks = (
-            ("integration_tests", "No project-specific integration-test adapter configured"),
-            ("static_analysis", "No project-specific static-analysis adapter configured"),
-            ("dead_links", "Project-specific crawler not configured"),
-            ("orphan_pages", "Project-specific route graph not configured"),
-            ("broken_buttons", "No UI interaction adapter configured"),
-            ("navigation", "No navigation adapter configured"),
-            ("ui_gate", "No project-specific UI adapter configured"),
-            ("rtl", "No RTL validation adapter configured"),
-            ("localization", "No localization completeness adapter configured"),
-        )
-        for name, reason in strict_checks:
+        integration_dir = self.root / "tests" / "integration"
+        integration_files = list((self.root / "tests").glob("test_integration*.py")) if (self.root / "tests").is_dir() else []
+        integration_applicable = kind == "python" and (integration_dir.is_dir() or bool(integration_files))
+        integration_required = strict and policy.required("integration_tests", applicable=integration_applicable)
+        if integration_applicable:
+            target = str(integration_dir) if integration_dir.is_dir() else "tests"
             steps.append(
-                GateStep(
-                    name,
-                    GateStatus.NOT_CONFIGURED if strict else GateStatus.SKIP,
-                    strict,
-                    reason,
+                self._cmd(
+                    "integration_tests",
+                    [sys.executable, "-m", "unittest", "discover", "-s", target, "-p", "test*.py", "-v"],
+                    required=integration_required,
                 )
             )
+        else:
+            steps.append(
+                GateStep(
+                    "integration_tests",
+                    GateStatus.NOT_CONFIGURED if integration_required else GateStatus.SKIP,
+                    integration_required,
+                    "No separate integration-test suite detected",
+                )
+            )
+
+        static_applicable = kind == "python"
+        static_required = strict and policy.required("static_analysis", applicable=static_applicable)
+        if static_applicable:
+            findings = audit_python_sources(self.root)
+            severe = [f for f in findings if f.severity in {"critical", "high"}]
+            steps.append(
+                GateStep(
+                    "static_analysis",
+                    GateStatus.FAIL if severe else GateStatus.PASS,
+                    static_required,
+                    "\n".join(
+                        f"{f.path}:{f.line} {f.code} {f.message}" for f in severe[:100]
+                    )
+                    if severe
+                    else f"Python AST audit passed; {len(findings)} review-level finding(s)",
+                )
+            )
+        else:
+            steps.append(
+                GateStep(
+                    "static_analysis",
+                    GateStatus.NOT_CONFIGURED if static_required else GateStatus.SKIP,
+                    static_required,
+                    "No static-analysis adapter for this project kind",
+                )
+            )
+
+        for check, policy_key in (
+            (check_local_links(self.root), "dead_links"),
+            (check_orphan_html(self.root), "orphan_pages"),
+            (check_tk_buttons(self.root), "broken_buttons"),
+            (check_rtl_signals(self.root), "rtl"),
+            (check_localization(self.root), "localization"),
+        ):
+            required = strict and policy.required(policy_key, applicable=check.applicable)
+            if check.applicable:
+                status = GateStatus.PASS if check.passed else GateStatus.FAIL
+            else:
+                status = GateStatus.NOT_CONFIGURED if required else GateStatus.SKIP
+            steps.append(GateStep(check.name, status, required, check.details))
+
+        health = inspect_workspace(self.root)
+        health_details = []
+        if health.escaped_symlinks:
+            health_details.append("escaped symlinks: " + ", ".join(health.escaped_symlinks))
+        if health.case_collisions:
+            health_details.append("case collisions: " + ", ".join(f"{a} <> {b}" for a, b in health.case_collisions))
+        if health.oversized_source_files:
+            health_details.append("oversized sources: " + ", ".join(health.oversized_source_files))
+        steps.append(
+            GateStep(
+                "workspace_health",
+                GateStatus.PASS if health.healthy else GateStatus.FAIL,
+                True,
+                "Workspace health checks passed" if health.healthy else "\n".join(health_details),
+            )
+        )
+
+        has_navigation_surface = bool(list(self.root.rglob("*.html")))
+        navigation_required = strict and policy.required("navigation", applicable=has_navigation_surface)
+        steps.append(
+            GateStep(
+                "navigation",
+                GateStatus.NOT_CONFIGURED if navigation_required else GateStatus.SKIP,
+                navigation_required,
+                "Interactive navigation adapter is not yet configured",
+            )
+        )
+
+        ui_required = strict and policy.required("ui_gate", applicable=True)
+        steps.append(
+            GateStep(
+                "ui_gate",
+                GateStatus.NOT_CONFIGURED if ui_required else GateStatus.SKIP,
+                ui_required,
+                "Runtime screenshot/interaction UI adapter is not yet configured",
+            )
+        )
         steps.extend(self._artifact_steps(strict=strict))
 
         ready = all(

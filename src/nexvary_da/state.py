@@ -24,7 +24,7 @@ class TaskRecord:
 class ProjectState:
     """Durable operational state stored inside .nexvary-da/state.sqlite3."""
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, project_root: str | Path):
         root = Path(project_root).resolve(strict=True)
@@ -152,3 +152,64 @@ class ProjectState:
                 "SELECT role, worker_id, status, last_task, updated_at FROM agent_slots"
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def list_events(
+        self,
+        *,
+        limit: int = 100,
+        kind: str | None = None,
+    ) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 5000))
+        with self._lock:
+            if kind:
+                rows = self._db.execute(
+                    "SELECT id, created_at, kind, agent, payload FROM events WHERE kind=? ORDER BY id DESC LIMIT ?",
+                    (kind, bounded),
+                ).fetchall()
+            else:
+                rows = self._db.execute(
+                    "SELECT id, created_at, kind, agent, payload FROM events ORDER BY id DESC LIMIT ?",
+                    (bounded,),
+                ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except json.JSONDecodeError:
+                item["payload"] = {"raw": item["payload"]}
+            result.append(item)
+        return result
+
+    def list_gate_runs(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        bounded = max(1, min(int(limit), 500))
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT id, created_at, ready, report FROM gate_runs ORDER BY id DESC LIMIT ?",
+                (bounded,),
+            ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["ready"] = bool(item["ready"])
+            try:
+                item["report"] = json.loads(item["report"])
+            except json.JSONDecodeError:
+                item["report"] = {"raw": item["report"]}
+            result.append(item)
+        return result
+
+    def prune_events(self, *, keep: int = 5000) -> int:
+        keep = max(0, int(keep))
+        with self._lock, self._db:
+            if keep == 0:
+                cur = self._db.execute("DELETE FROM events")
+                return int(cur.rowcount)
+            threshold = self._db.execute(
+                "SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET ?",
+                (keep - 1,),
+            ).fetchone()
+            if threshold is None:
+                return 0
+            cur = self._db.execute("DELETE FROM events WHERE id < ?", (threshold["id"],))
+            return int(cur.rowcount)

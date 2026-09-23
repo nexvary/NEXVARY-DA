@@ -125,6 +125,68 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
         }
 
     @mcp.tool()
+    def process_start(args: list[str], cwd: str = "") -> dict[str, Any]:
+        """Start a cancellable local process inside the approved workspace."""
+        service._require(Permission.SHELL)
+        workdir = service.runtime.root / cwd if cwd else service.runtime.root
+        item = service.runtime.processes.start(args, cwd=workdir)
+        return {
+            "process_id": item.process_id,
+            "pid": item.pid,
+            "args": list(item.args),
+            "cwd": item.cwd,
+        }
+
+    @mcp.tool()
+    def process_status(process_id: str) -> dict[str, Any]:
+        """Inspect retained output and completion state for a managed process."""
+        item = service.runtime.processes.get(process_id)
+        if item is None:
+            return {"found": False, "process_id": process_id}
+        return {
+            "found": True,
+            "process_id": item.process_id,
+            "pid": item.pid,
+            "args": list(item.args),
+            "cwd": item.cwd,
+            "returncode": item.returncode,
+            "output": item.output[-1000:],
+        }
+
+    @mcp.tool()
+    def process_cancel(process_id: str) -> bool:
+        """Cancel one managed process. Shell permission is required."""
+        service._require(Permission.SHELL)
+        return service.runtime.processes.cancel(process_id)
+
+    @mcp.tool()
+    def recent_events(limit: int = 50, kind: str = "") -> list[dict[str, Any]]:
+        """Return recent durable project events for resume/debugging."""
+        return service.runtime.state.list_events(limit=limit, kind=kind or None)
+
+    @mcp.tool()
+    def android_environment() -> dict[str, Any]:
+        """Return Android SDK/ADB/Java/Gradle-wrapper discovery."""
+        return service.runtime.android_tools().environment().to_dict()
+
+    @mcp.tool()
+    def android_devices() -> dict[str, Any]:
+        """List ADB devices; requires the independent adb permission."""
+        result = service.runtime.android_tools().devices()
+        return {"returncode": result.returncode, "output": result.stdout}
+
+    @mcp.tool()
+    def github_snapshot() -> dict[str, Any]:
+        """Fetch a compact GitHub PR/Actions/Release snapshot using local network permission."""
+        client = service.runtime.github_client()
+        branch = service.runtime.git.branch() or ""
+        return {
+            "pull_requests": client.pull_requests(per_page=10),
+            "workflow_runs": client.workflow_runs(branch=branch, per_page=10),
+            "releases": client.releases(per_page=10),
+        }
+
+    @mcp.tool()
     def git_status() -> dict[str, Any]:
         """Return branch, commit, changes and porcelain status."""
         service._require(Permission.SHELL)
