@@ -54,3 +54,16 @@ The Release Gate includes a local high-confidence scanner for common private-key
 ## Non-goals
 
 No whole-machine filesystem access, automatic privilege elevation, silent deletion, silent network access, silent Git push, silent release publication, browser credential extraction or unrestricted desktop automation.
+
+
+## Runtime UI automation boundaries
+
+Desktop UI probing requires the independent `desktop_automation` capability. Screenshot output is restricted to the approved workspace and additionally requires `write`.
+
+Android runtime inspection and interaction require the independent `adb` capability. Device screenshots are written only inside the approved workspace and require `write`. ADB actions never inherit permission merely because shell access was granted.
+
+ZCode remains a plan-only worker. UI automation, ADB interaction, file mutation, Git mutation and release operations remain NEXVARY-controlled capabilities.
+
+## Signing credentials
+
+Production signing credentials must not be committed to project state or source control. Signing readiness checks expose only whether the required tool/reference is present. NEXVARY-DA does not generate self-signed identities and present them as production signatures.

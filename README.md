@@ -58,3 +58,16 @@ NEXVARY-DA supports the official ZCode CLI as a guarded planning engine. Select 
 
 ZCode is forced into plan-only mode. NEXVARY remains the authority for file, shell, Git, build, ADB and release execution. Set `NEXVARY_DA_ZCODE_BIN` when the `zcode` executable is not already on `PATH`. See `ZCODE_INTEGRATION.md`.
 
+
+
+## Runtime UI and native packaging
+
+Stage 300 adds runtime UI/interaction evidence, Android ADB UI automation, and native packaging.
+
+```bash
+nexvary-da ui-probe . --screenshot .nexvary-da/ui-probe.png
+nexvary-da android-ui . --tap "Settings" --screenshot .nexvary-da/android-ui/shot.png
+nexvary-da signing-status .
+```
+
+The CI pipeline builds and smoke-tests a one-file native executable on Windows and Linux, an NSIS Windows Setup, a Debian package, and portable bundles. Production code signing is deliberately separate: real organization-controlled signing credentials are required and are never generated or committed by NEXVARY-DA.

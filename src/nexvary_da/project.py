@@ -9,6 +9,7 @@ from pathlib import Path
 from .agents import AgentPool
 from .checkpoint import CheckpointStore
 from .android_profile import AndroidTools
+from .android_ui import AndroidUIHarness
 from .errors import ConfigurationError
 from .file_tools import FileTools
 from .github_client import GitHubRESTClient
@@ -111,6 +112,9 @@ class ProjectRuntime:
 
     def android_tools(self) -> AndroidTools:
         return AndroidTools(self.guard, self.runner, self.root)
+
+    def android_ui(self) -> AndroidUIHarness:
+        return AndroidUIHarness(self.guard, self.runner, self.state, self.root)
 
     def github_client(self, *, token_env: str = "GITHUB_TOKEN") -> GitHubRESTClient:
         if not self.config.repository:

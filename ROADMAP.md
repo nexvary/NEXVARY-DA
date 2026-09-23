@@ -1,41 +1,38 @@
 # NEXVARY-DA Roadmap
 
-## Stage 250 hybrid developer-agent core
+## Stage 300 developer-agent platform
 
-- Approved workspace and independent capability permissions.
-- Persistent project state, reusable Agents and persistent terminals.
+- Workspace permission boundary and persistent state.
 - Native / ZCode / Hybrid planning.
-- ZCode plan-only security boundary.
-- Strict machine plans and guarded local execution.
-- Dry-run and explicit mutation approval.
-- File/process/Git/build/test/Android/GitHub tools.
+- Guarded plan execution with dry-run and explicit mutation approval.
+- Persistent terminals, managed processes, Git/build/test/Android/GitHub tools.
 - Fast / Engineer / Release verification.
-- Validation cache and changed-file tracking.
-- Python / Gradle / Node / CMake profiles.
-- Android Manifest/resource/localization static QA.
-- Dead-link/orphan-page/Tk-button/RTL/localization/workspace-health checks.
-- Artifact SHA-256 and deterministic source provenance.
+- Python / Gradle / Node / CMake build profiles.
+- Static QA and Android source QA.
+- Artifact/source SHA-256 provenance.
 - Checkpoint / Compact / Resume.
-- Project Doctor.
+- Runtime desktop UI geometry and interaction probe.
+- Linux/Xvfb real screenshot evidence tied to source fingerprint.
+- Android ADB runtime UI harness.
+- Windows/Linux native one-file binaries.
+- Windows NSIS installer.
+- Debian package.
+- Portable native bundles.
+- Production signing-readiness diagnostics.
 - Project-bound MCP.
-- Dark/Gold/Blue QHD-aware desktop shell.
-- Windows and Ubuntu CI package artifacts.
+- QHD-aware Dark/Gold/Blue desktop shell.
 
 ## Next hardening
 
-- Runtime desktop screenshot capture.
-- UI geometry/overflow visual gate.
-- Interactive button/navigation automation.
-- Android emulator/device orchestration and screenshots.
-- Rich GitHub Actions log and artifact-download UX.
-- Signed Windows installer and Linux packages.
-- OS credential-vault provider.
-- Controlled signed release publication.
+- Production Authenticode signing once a real certificate is supplied.
+- Linux repository/package signing once an organizational signing key is supplied.
+- Target Android emulator/device matrices for specific application projects.
+- Screenshot baselines and pixel/structural diff thresholds per project.
+- Rich GitHub Actions artifact-download and release-publication UX.
+- OS credential vault integration.
+- Reproducible-build comparison across isolated runners.
+- Crash recovery and task replay across interrupted local executions.
 
-## External decision required
+## External decisions / credentials required
 
-Production cloud-provider/model/API credentials and cost policy must be selected explicitly. NEXVARY-DA will not silently select or spend against a paid provider.
-
-## Later
-
-Optional local/offline models, semantic code indexing, richer Compact & Resume context selection, desktop automation broker and reproducible signed releases.
+NEXVARY-DA will not invent or self-sign production identities. Windows code signing, Linux package/repository signing, and production cloud API usage require organization-controlled credentials and explicit policy.

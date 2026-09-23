@@ -15,6 +15,7 @@ from .modes import WorkMode
 from .orchestration import parse_plan_json
 from .permissions import Permission
 from .project import ProjectRuntime
+from .signing_readiness import inspect_signing_readiness
 from .provenance import build_provenance, write_provenance
 
 
@@ -273,6 +274,31 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
             path = write_provenance(service.runtime)
             payload["written_to"] = str(path.relative_to(service.runtime.root))
         return payload
+
+    @mcp.tool()
+    def android_ui_inspect() -> dict[str, Any]:
+        """Inspect connected Android device UI hierarchy through ADB."""
+        return service.runtime.android_ui().inspect()
+
+    @mcp.tool()
+    def android_ui_tap_label(label: str) -> dict[str, Any]:
+        """Tap the first enabled Android UI node matching label/text/resource-id."""
+        return service.runtime.android_ui().tap_label(label)
+
+    @mcp.tool()
+    def android_ui_back() -> dict[str, Any]:
+        """Send Android Back through ADB."""
+        return service.runtime.android_ui().press_back()
+
+    @mcp.tool()
+    def android_ui_screenshot(path: str = ".nexvary-da/android-ui/screenshot.png") -> dict[str, Any]:
+        """Capture a connected Android device screenshot inside the approved workspace."""
+        return service.runtime.android_ui().screenshot(path)
+
+    @mcp.tool()
+    def signing_readiness() -> dict[str, Any]:
+        """Report production code-signing tool/credential readiness without exposing secrets."""
+        return inspect_signing_readiness().to_dict()
 
     @mcp.tool()
     def git_status() -> dict[str, Any]:

@@ -15,6 +15,7 @@ from .permissions import Permission
 from .project import ProjectRuntime, init_project
 from .project_import import ProjectImporter
 from .provenance import build_provenance, write_provenance
+from .signing_readiness import inspect_signing_readiness
 from .ui import launch_ui
 from .ui_probe import run_runtime_ui_probe
 
@@ -107,6 +108,16 @@ def build_parser() -> argparse.ArgumentParser:
     ui_probe.add_argument("--height", type=int, default=900)
     ui_probe.add_argument("--screenshot", default="")
     ui_probe.add_argument("--require-screenshot", action="store_true")
+
+    android_ui = sub.add_parser("android-ui", help="Inspect and automate a connected Android UI through ADB")
+    android_ui.add_argument("path", nargs="?", default=".")
+    android_ui.add_argument("--component", default="")
+    android_ui.add_argument("--tap", action="append", default=[])
+    android_ui.add_argument("--back", action="store_true")
+    android_ui.add_argument("--screenshot", default="")
+
+    signing = sub.add_parser("signing-status", help="Show production code-signing readiness")
+    signing.add_argument("path", nargs="?", default=".")
 
     for name, help_text in (
         ("status", "Show durable project state"),
@@ -203,6 +214,27 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
             return 0 if report.ready else 2
+
+        if args.command == "android-ui":
+            harness = runtime.android_ui()
+            payload = {"actions": []}
+            if args.component:
+                payload["actions"].append({"start": harness.start_component(args.component)})
+            payload["inspect_before"] = harness.inspect()
+            for label in args.tap:
+                payload["actions"].append({"tap": harness.tap_label(label)})
+            if args.back:
+                payload["actions"].append({"back": harness.press_back()})
+            if args.screenshot:
+                payload["actions"].append({"screenshot": harness.screenshot(args.screenshot)})
+            payload["inspect_after"] = harness.inspect()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "signing-status":
+            payload = inspect_signing_readiness().to_dict()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload["ready"] else 2
 
         if args.command == "status":
             if Permission.SHELL in runtime.config.permissions:

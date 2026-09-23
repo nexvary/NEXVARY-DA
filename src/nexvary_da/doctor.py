@@ -8,6 +8,7 @@ from typing import Any
 from .android_qa import audit_android_project
 from .build_profiles import profile_for
 from .environment import discover_environment, detect_project_kind
+from .signing_readiness import inspect_signing_readiness
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,15 @@ def run_project_doctor(runtime) -> dict[str, Any]:
             "git_tool",
             "PASS" if shell_tool.get("available") else "WARN",
             str(shell_tool.get("version") or "Git not discovered"),
+        )
+    )
+
+    signing = inspect_signing_readiness()
+    checks.append(
+        DoctorCheck(
+            "release_signing",
+            "PASS" if signing.ready else "WARN",
+            "ready" if signing.ready else "Missing: " + ", ".join(signing.missing),
         )
     )
 
