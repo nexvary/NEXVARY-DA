@@ -7,12 +7,15 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
+from .android_qa import audit_android_project
 from .coordinator import DevelopmentCoordinator
+from .doctor import run_project_doctor
 from .engine_router import AgentEngine, EngineRouter
 from .modes import WorkMode
 from .orchestration import parse_plan_json
 from .permissions import Permission
 from .project import ProjectRuntime
+from .provenance import build_provenance, write_provenance
 
 
 class ProjectMCPService:
@@ -251,6 +254,25 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
     def compact_resume_context(max_events: int = 20) -> dict[str, Any]:
         """Build a redacted compact context suitable for resuming engineering work."""
         return service.runtime.checkpoints().compact_resume(max_events=max_events)
+
+    @mcp.tool()
+    def project_doctor() -> dict[str, Any]:
+        """Run non-destructive project/environment diagnostics."""
+        return run_project_doctor(service.runtime)
+
+    @mcp.tool()
+    def android_static_qa() -> dict[str, Any]:
+        """Run Android Manifest/resource/localization static QA when applicable."""
+        return audit_android_project(service.runtime.root).to_dict()
+
+    @mcp.tool()
+    def release_provenance(write: bool = False) -> dict[str, Any]:
+        """Build release provenance; optionally persist it under .nexvary-da."""
+        payload = build_provenance(service.runtime)
+        if write:
+            path = write_provenance(service.runtime)
+            payload["written_to"] = str(path.relative_to(service.runtime.root))
+        return payload
 
     @mcp.tool()
     def git_status() -> dict[str, Any]:

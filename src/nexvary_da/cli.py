@@ -6,6 +6,7 @@ from dataclasses import asdict
 
 from .agents import AgentRole, BuilderAgent, QAAgent
 from .coordinator import DevelopmentCoordinator
+from .doctor import run_project_doctor
 from .engine_router import AgentEngine, EngineRouter
 from .environment import discover_environment
 from .mcp_server import run_mcp
@@ -13,6 +14,7 @@ from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime, init_project
 from .project_import import ProjectImporter
+from .provenance import build_provenance, write_provenance
 from .ui import launch_ui
 
 
@@ -85,8 +87,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plan.add_argument("--context", default="")
 
+    checkpoint = sub.add_parser("checkpoint", help="Create a durable redacted project checkpoint")
+    checkpoint.add_argument("path", nargs="?", default=".")
+    checkpoint.add_argument("--label", default="")
+    checkpoint.add_argument("--note", default="")
+
+    resume = sub.add_parser("resume-context", help="Print compact redacted resume context")
+    resume.add_argument("path", nargs="?", default=".")
+    resume.add_argument("--events", type=int, default=20)
+
+    provenance = sub.add_parser("provenance", help="Build release provenance and source fingerprint")
+    provenance.add_argument("path", nargs="?", default=".")
+    provenance.add_argument("--write", action="store_true")
+
     for name, help_text in (
         ("status", "Show durable project state"),
+        ("doctor", "Run non-destructive project diagnostics"),
         ("discover", "Discover local build tools"),
         ("build", "Run the Builder agent adapter"),
         ("qa", "Run the QA agent adapter"),
@@ -145,6 +161,28 @@ def main(argv: list[str] | None = None) -> int:
 
     runtime = ProjectRuntime(args.path)
     try:
+        if args.command == "doctor":
+            print(json.dumps(run_project_doctor(runtime), indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "checkpoint":
+            payload = runtime.checkpoints().create(label=args.label, note=args.note)
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "resume-context":
+            payload = runtime.checkpoints().compact_resume(max_events=args.events)
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "provenance":
+            payload = build_provenance(runtime)
+            if args.write:
+                path = write_provenance(runtime)
+                payload["written_to"] = str(path.relative_to(runtime.root))
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
         if args.command == "status":
             if Permission.SHELL in runtime.config.permissions:
                 branch = runtime.git.branch()

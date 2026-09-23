@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from .android_qa import audit_android_project
 from .build_profiles import profile_for
 from .environment import detect_project_kind
 from .process import ProcessRunner
@@ -317,6 +318,28 @@ class ReleaseGate:
                 "Workspace health checks passed" if health.healthy else "\n".join(health_details),
             )
         )
+
+        android_report = audit_android_project(self.root)
+        if android_report.applicable:
+            error_count = sum(1 for issue in android_report.issues if issue.severity == "error")
+            warning_count = sum(1 for issue in android_report.issues if issue.severity == "warning")
+            steps.append(
+                GateStep(
+                    "android_qa",
+                    GateStatus.PASS if android_report.ready else GateStatus.FAIL,
+                    strict,
+                    f"{error_count} error(s), {warning_count} warning(s); manifest={android_report.manifest}",
+                )
+            )
+        else:
+            steps.append(
+                GateStep(
+                    "android_qa",
+                    GateStatus.SKIP,
+                    False,
+                    "No Android source tree detected",
+                )
+            )
 
         has_navigation_surface = bool(list(self.root.rglob("*.html")))
         navigation_required = strict and policy.required("navigation", applicable=has_navigation_surface)
