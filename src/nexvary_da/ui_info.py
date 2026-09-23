@@ -88,6 +88,7 @@ class _InfoWindow:
         return self.tk.Label(
             parent, text=text, bg=parent.cget("bg"), fg=fg or PALETTE.text,
             justify="left", anchor="w",
+            wraplength=self.px(800),
             font=(self.font, self.px(size), "bold" if bold else "normal"),
         )
 
@@ -125,7 +126,11 @@ class _InfoWindow:
         scrollbar = self.tk.Scrollbar(self.window, orient="vertical", command=canvas.yview)
         body = self.tk.Frame(canvas, bg=PALETTE.background)
         body.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=body, anchor="nw")
+        body_window = canvas.create_window((0, 0), window=body, anchor="nw")
+        canvas.bind(
+            "<Configure>",
+            lambda event: canvas.itemconfigure(body_window, width=max(1, event.width)),
+        )
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
