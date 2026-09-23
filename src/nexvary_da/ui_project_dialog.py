@@ -17,7 +17,7 @@ def open_add_project_dialog(
     scale: float,
     append: Callable[[str], None],
     on_imported: Callable[[object], None],
-) -> None:
+) -> object:
     import tkinter as tk
     from tkinter import messagebox
 
@@ -32,7 +32,7 @@ def open_add_project_dialog(
     dialog.geometry(f"{px(720)}x{px(430)}")
     dialog.columnconfigure(0, weight=1)
 
-    wrap = tk.Frame(dialog, bg=PALETTE.surface, highlightbackground=PALETTE.border, highlightthickness=1)
+    wrap = tk.Frame(dialog, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
     wrap.grid(row=0, column=0, sticky="nsew", padx=px(14), pady=px(14))
     wrap.columnconfigure(1, weight=1)
 
@@ -49,8 +49,8 @@ def open_add_project_dialog(
 
     def entry(var, row: int):
         e = tk.Entry(wrap, textvariable=var, bg=PALETTE.surface_alt, fg=PALETTE.text,
-                     insertbackground=PALETTE.gold, relief="flat", highlightthickness=1,
-                     highlightbackground=PALETTE.border, highlightcolor=PALETTE.blue)
+                     insertbackground=PALETTE.action, relief="flat", highlightthickness=1,
+                     highlightbackground=PALETTE.silver, highlightcolor=PALETTE.cyan)
         e.grid(row=row, column=1, sticky="ew", padx=(0, px(14)), pady=px(5), ipady=px(5))
         return e
 
@@ -80,10 +80,15 @@ def open_add_project_dialog(
     actions.grid(row=5, column=0, columnspan=2, sticky="e", padx=px(14), pady=px(12))
 
     def make_button(text: str, command, accent: bool = False):
-        return tk.Button(actions, text=text, command=command, relief="flat", bd=0, cursor="hand2",
-                         bg=PALETTE.gold if accent else PALETTE.surface_alt,
-                         fg=PALETTE.background if accent else PALETTE.text, padx=px(12), pady=px(7),
-                         font=(font_family, px(8), "bold"))
+        return tk.Button(
+            actions, text=text, command=command, relief="flat", bd=0, cursor="hand2",
+            bg=PALETTE.action if accent else PALETTE.surface_alt,
+            fg=PALETTE.background if accent else PALETTE.action,
+            activebackground=PALETTE.action_hover, activeforeground=PALETTE.background,
+            highlightthickness=1, highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
+            padx=px(12), pady=px(7), font=(font_family, px(8), "bold"),
+        )
 
     make_button("CANCEL", dialog.destroy).pack(side="right", padx=px(4))
 
@@ -114,3 +119,4 @@ def open_add_project_dialog(
     add = make_button("ADD PROJECT", start, True)
     add.pack(side="right", padx=px(4))
     url_entry.focus_set()
+    return dialog

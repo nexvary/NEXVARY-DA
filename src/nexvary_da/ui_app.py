@@ -11,6 +11,7 @@ from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime
 from .ui_easy_mode import EasyModePanel
+from .ui_info import open_about_window, open_system_overview_window
 from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
 from .ui_toolbox import open_toolbox
@@ -124,6 +125,19 @@ class DeveloperAgentUI:
         for color in (PALETTE.cyan, PALETTE.blue, PALETTE.purple, PALETTE.magenta, PALETTE.orange, PALETTE.gold):
             tk.Frame(spectrum, bg=color).pack(side="left", fill="both", expand=True)
 
+        info_nav = tk.Frame(self.window, bg=PALETTE.surface,
+                            highlightbackground=PALETTE.silver, highlightthickness=1)
+        info_nav.pack(fill="x")
+        self.label(info_nav, "NEXVARY INFO", size=7, fg=PALETTE.muted, bold=True).pack(
+            side="left", padx=(self.px(14), self.px(8)), pady=self.px(5)
+        )
+        self.button(info_nav, "ABOUT / عنا", self.open_about).pack(
+            side="left", padx=self.px(3), pady=self.px(4)
+        )
+        self.button(info_nav, "SYSTEM / حول النظام", self.open_system_overview).pack(
+            side="left", padx=self.px(3), pady=self.px(4)
+        )
+
         self.easy_body = self.card(self.window)
         self.easy_panel = EasyModePanel(self.easy_body, self)
 
@@ -152,6 +166,12 @@ class DeveloperAgentUI:
             self.easy_panel.refresh()
         else:
             self.advanced_body.pack(fill="both", expand=True)
+
+    def open_about(self):
+        return open_about_window(self.window, font_family=self.font, scale=self.scale)
+
+    def open_system_overview(self):
+        return open_system_overview_window(self.window, font_family=self.font, scale=self.scale)
 
     def open_integrations(self) -> None:
         open_integration_center(
@@ -409,13 +429,13 @@ class DeveloperAgentUI:
                 self.window.after(0, failed)
         threading.Thread(target=worker, daemon=True).start()
 
-    def add_project(self)->None:
+    def add_project(self):
         def imported(p):
             self.plist.insert("end",f"●  {p.name}"); self.append(f"PROJECT READY • {p.path} • {'reused' if p.reused_existing_clone else 'cloned'} • {p.project_kind}")
             if hasattr(self, "easy_panel"):
                 self.easy_panel.set_message(f"Project ready: {p.name}")
                 self.easy_panel.refresh()
-        open_add_project_dialog(self.window,runtime=self.runtime,font_family=self.font,scale=self.scale,append=self.append,on_imported=imported)
+        return open_add_project_dialog(self.window,runtime=self.runtime,font_family=self.font,scale=self.scale,append=self.append,on_imported=imported)
 
     def _poll_changes(self)->None:
         try:
