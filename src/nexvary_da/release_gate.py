@@ -8,11 +8,20 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from .build_profiles import profile_for
 from .environment import detect_project_kind
 from .process import ProcessRunner
+from .release_policy import load_release_policy
+from .source_audit import audit_python_sources
 from .state import ProjectState
-
-
+from .static_qa import (
+    check_local_links,
+    check_localization,
+    check_orphan_html,
+    check_rtl_signals,
+    check_tk_buttons,
+)
+from .workspace_health import inspect_workspace
 class GateStatus(StrEnum):
     PASS = "PASS"
     FAIL = "FAIL"
@@ -149,6 +158,7 @@ class ReleaseGate:
 
     def run(self, *, strict: bool = False) -> GateReport:
         kind = detect_project_kind(self.root)
+        policy = load_release_policy(self.root)
         steps: list[GateStep] = []
 
         if kind == "python":
