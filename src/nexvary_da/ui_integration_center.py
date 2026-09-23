@@ -231,6 +231,24 @@ class IntegrationCenter:
                 size=8,
                 fg=PALETTE.warning,
             ).pack(anchor="w", pady=(0, self.px(5)))
+        if status.missing_requirements:
+            self.label(
+                content,
+                "Not found yet: " + ", ".join(status.missing_requirements),
+                size=8,
+                fg=PALETTE.warning,
+            ).pack(anchor="w", pady=(0, self.px(5)))
+        if status.missing_environment:
+            friendly = [
+                "session API key" if item == "OYA_API_KEY" else item
+                for item in status.missing_environment
+            ]
+            self.label(
+                content,
+                "Still needed: " + ", ".join(friendly),
+                size=8,
+                fg=PALETTE.warning,
+            ).pack(anchor="w", pady=(0, self.px(5)))
 
         values = self.store.load()
         if plugin_id == "fastmcp":

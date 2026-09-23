@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 350
+- Current milestone candidate: Stage 400
 
 ## Verified baseline before Stage 300
 
@@ -68,3 +68,16 @@ The Stage 300 baseline was verified at commit fed16db221c4c2b72c4be9df1a76940402
 - No external project is auto-installed, auto-downloaded, or granted permissions by discovery.
 
 Stage 350 is accepted only after the exact candidate head passes Windows and Ubuntu CI, including the Stage 300 native packaging checks.
+
+
+## Stage 351-400 usability candidate
+
+- Easy Mode is the default desktop experience.
+- Advanced engineering controls and terminal are hidden until explicitly requested.
+- Graphical Setup Center replaces manual environment-variable/path configuration for non-secret integration settings.
+- Session credentials such as Oya API keys are not persisted.
+- Graphical Tool Box exposes Desktop, Browser, Image, Video, Voice, and MCP workflows as forms.
+- Common task planning automatically selects Hybrid when ZCode is available, otherwise Native.
+- Strict release verification is available from one visible button.
+
+The candidate is accepted only after the exact Stage 400 head passes Windows and Ubuntu Core CI, runtime UI probe, and native packaging/install smoke tests.

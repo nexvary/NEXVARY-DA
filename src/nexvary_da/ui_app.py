@@ -13,6 +13,7 @@ from .project import ProjectRuntime
 from .ui_easy_mode import EasyModePanel
 from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
+from .ui_toolbox import open_toolbox
 from .ui_terminal import TerminalPanel
 from .ui_theme import PALETTE, scale_for_screen, status_color
 
@@ -127,6 +128,21 @@ class DeveloperAgentUI:
             scale=self.scale,
             on_change=self.refresh_all_integrations,
         )
+
+    def open_toolbox(self) -> None:
+        open_toolbox(
+            self.window,
+            self.runtime,
+            font_family=self.font,
+            scale=self.scale,
+        )
+
+    def run_release_check(self) -> None:
+        self.mode.set(WorkMode.RELEASE.value)
+        self.easy_panel.set_message(
+            "Running the strict release check. NEXVARY will show what still blocks release."
+        )
+        self.run_verification()
 
     def refresh_all_integrations(self) -> None:
         self.refresh_integrations()

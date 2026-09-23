@@ -80,6 +80,7 @@ class EasyModePanel:
         grid.columnconfigure(1, weight=1)
         grid.rowconfigure(0, weight=1)
         grid.rowconfigure(1, weight=1)
+        grid.rowconfigure(2, weight=1)
 
         cards = (
             self._action_card(
@@ -99,10 +100,24 @@ class EasyModePanel:
             ),
             self._action_card(
                 grid,
+                "Automation & media",
+                "Use browser, desktop, image, video, voice and MCP through simple forms.",
+                "OPEN TOOL BOX",
+                self.app.open_toolbox,
+            ),
+            self._action_card(
+                grid,
                 "Tools & integrations",
                 "Connect desktop automation, browser, voice, image and video tools from one setup screen.",
                 "OPEN SETUP CENTER",
                 self.app.open_integrations,
+            ),
+            self._action_card(
+                grid,
+                "Release check",
+                "Run the strict release gate and see exactly what still blocks a safe release.",
+                "CHECK RELEASE",
+                self.app.run_release_check,
             ),
             self._action_card(
                 grid,

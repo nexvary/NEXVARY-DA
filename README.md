@@ -90,3 +90,19 @@ Useful commands:
 No external project is auto-installed or silently downloaded. Cua mutation requires Desktop Automation plus explicit mutation approval. Oya browser credentials/personas remain outside NEXVARY state. Qwen-Image 2.1 weights are not bundled; the reviewed upstream Research License is non-commercial by default, so commercial use requires a separate upstream license.
 
 See INTEGRATIONS.md and STAGES_301_350.md.
+
+
+## Easy Mode
+
+The desktop UI now opens in **Easy Mode** by default. Common work is presented as outcomes rather than commands:
+
+- Start a task
+- Build & test
+- Automation & media Tool Box
+- Tools & integrations Setup Center
+- Release check
+- Add project
+
+Advanced Mode keeps the terminal, agent pool, engine controls, evidence timeline, and low-level operations for engineering users.
+
+Non-secret integration paths can be configured with file/folder pickers and are stored in `.nexvary-da/integrations.json`. API keys and credentials are never persisted there.
