@@ -6,7 +6,7 @@ RequestExecutionLevel user
 !define EXE "NEXVARY-DA.exe"
 
 Name "${APPNAME}"
-OutFile "release-native\NEXVARY-DA-Setup.exe"
+OutFile "..\..\release-native\NEXVARY-DA-Setup.exe"
 InstallDir "$LOCALAPPDATA\NEXVARY\Developer Agent"
 InstallDirRegKey HKCU "Software\NEXVARY\DeveloperAgent" "InstallDir"
 
@@ -18,10 +18,10 @@ UninstPage instfiles
 
 Section "Install"
   SetOutPath "$INSTDIR"
-  File "dist-native\NEXVARY-DA.exe"
-  File "README.md"
-  File "LICENSE"
-  File "THIRD_PARTY_NOTICES.md"
+  File "..\..\dist-native\NEXVARY-DA.exe"
+  File "..\..\README.md"
+  File "..\..\LICENSE"
+  File "..\..\THIRD_PARTY_NOTICES.md"
   WriteRegStr HKCU "Software\NEXVARY\DeveloperAgent" "InstallDir" "$INSTDIR"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\NEXVARY"
