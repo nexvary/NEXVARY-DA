@@ -112,6 +112,18 @@ def _rect(widget, root) -> tuple[int, int, int, int]:
     return x, y, int(widget.winfo_width()), int(widget.winfo_height())
 
 
+def _inside_canvas(widget) -> bool:
+    current = getattr(widget, "master", None)
+    while current is not None:
+        try:
+            if str(current.winfo_class()) == "Canvas":
+                return True
+        except Exception:
+            pass
+        current = getattr(current, "master", None)
+    return False
+
+
 def _intersection(a: WidgetRecord, b: WidgetRecord) -> int:
     left = max(a.x, b.x)
     top = max(a.y, b.y)
@@ -154,7 +166,10 @@ def inspect_widget_tree(root, *, invoke_safe: bool = True) -> tuple[list[WidgetR
             continue
         if width <= 1 or height <= 1:
             issues.append(UIProbeIssue("error", "zero-geometry", record.path, f"{class_name} has {width}x{height} geometry"))
-        if x < -2 or y < -2 or x + width > window_width + 2 or y + height > window_height + 2:
+        if (
+            not _inside_canvas(widget)
+            and (x < -2 or y < -2 or x + width > window_width + 2 or y + height > window_height + 2)
+        ):
             issues.append(
                 UIProbeIssue(
                     "error",

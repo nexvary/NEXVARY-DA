@@ -217,7 +217,7 @@ class SystemOverviewWindow(_InfoWindow):
                 self.label(card, f"• {bullet}", size=8, fg=PALETTE.text).pack(
                     anchor="w", fill="x", padx=self.px(18), pady=self.px(2)
                 )
-            self.tk.Frame(card, bg=PALETTE.surface_alt, height=self.px(7)).pack()
+            self.tk.Frame(card, bg=PALETTE.surface_alt, height=self.px(7)).pack(fill="x")
 
         note = self.tk.Frame(body, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
         note.pack(fill="x", padx=self.px(18), pady=self.px(14))
