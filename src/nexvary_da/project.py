@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .agents import AgentPool
+from .checkpoint import CheckpointStore
 from .android_profile import AndroidTools
 from .errors import ConfigurationError
 from .file_tools import FileTools
@@ -126,6 +127,9 @@ class ProjectRuntime:
 
     def plan_executor(self) -> PlanExecutionManager:
         return PlanExecutionManager(self)
+
+    def checkpoints(self) -> CheckpointStore:
+        return CheckpointStore(self)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)

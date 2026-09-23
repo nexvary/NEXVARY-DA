@@ -235,6 +235,24 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
         ).to_dict()
 
     @mcp.tool()
+    def create_checkpoint(label: str = "", note: str = "") -> dict[str, Any]:
+        """Create a redacted durable resume checkpoint without copying source files."""
+        return service.runtime.checkpoints().create(label=label, note=note)
+
+    @mcp.tool()
+    def list_checkpoints(limit: int = 20) -> list[dict[str, Any]]:
+        """List durable checkpoint metadata."""
+        return [
+            asdict(item)
+            for item in service.runtime.checkpoints().list(limit=limit)
+        ]
+
+    @mcp.tool()
+    def compact_resume_context(max_events: int = 20) -> dict[str, Any]:
+        """Build a redacted compact context suitable for resuming engineering work."""
+        return service.runtime.checkpoints().compact_resume(max_events=max_events)
+
+    @mcp.tool()
     def git_status() -> dict[str, Any]:
         """Return branch, commit, changes and porcelain status."""
         service._require(Permission.SHELL)
