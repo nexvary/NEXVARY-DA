@@ -15,6 +15,7 @@ from .git_tools import GitTools
 from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
 from .process_registry import ProcessRegistry
+from .plan_execution import PlanExecutionManager
 from .release_gate import ReleaseGate
 from .state import ProjectState
 from .terminal import PersistentTerminal
@@ -122,6 +123,9 @@ class ProjectRuntime:
 
     def zcode(self) -> ZCodeAdapter:
         return ZCodeAdapter(self.guard, self.runner, self.state, self.root)
+
+    def plan_executor(self) -> PlanExecutionManager:
+        return PlanExecutionManager(self)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)

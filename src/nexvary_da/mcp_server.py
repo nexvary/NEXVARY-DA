@@ -10,6 +10,7 @@ from mcp.server.mcpserver import MCPServer
 from .coordinator import DevelopmentCoordinator
 from .engine_router import AgentEngine, EngineRouter
 from .modes import WorkMode
+from .orchestration import parse_plan_json
 from .permissions import Permission
 from .project import ProjectRuntime
 
@@ -205,6 +206,32 @@ def build_mcp_server(root: str | Path) -> tuple[MCPServer, ProjectMCPService]:
             engine=AgentEngine(engine),
             mode=WorkMode(mode),
             context=context,
+        ).to_dict()
+
+    @mcp.tool()
+    def review_execution_plan(plan_json: str, approve_mutations: bool = False) -> dict[str, Any]:
+        """Review a strict plan against the real NEXVARY tool and permission surface."""
+        plan = parse_plan_json(plan_json)
+        return service.runtime.plan_executor().review(
+            plan,
+            approve_mutations=approve_mutations,
+        )
+
+    @mcp.tool()
+    def execute_execution_plan(
+        plan_json: str,
+        approve_mutations: bool = False,
+        dry_run: bool = True,
+        stop_on_error: bool = True,
+    ) -> dict[str, Any]:
+        """Execute a reviewed plan. Dry-run is the default and mutations require explicit approval."""
+        plan = parse_plan_json(plan_json)
+        return service.runtime.plan_executor().execute(
+            plan,
+            approve_mutations=approve_mutations,
+            dry_run=dry_run,
+            stop_on_error=stop_on_error,
+            agent_id="MCP Coordinator",
         ).to_dict()
 
     @mcp.tool()
