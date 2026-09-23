@@ -10,11 +10,20 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from .integration_settings import IntegrationSettings
 from .permissions import Permission, WorkspaceGuard
 from .state import ProjectState
 
 
 _PLUGIN_ID = re.compile(r"^[a-z][a-z0-9_.-]{1,63}$")
+_ENV_SETTING = {
+    "NEXVARY_DA_FASTMCP_BIN": "fastmcp_bin",
+    "NEXVARY_DA_CUA_BIN": "cua_bin",
+    "NEXVARY_DA_NODE_BIN": "node_bin",
+    "NEXVARY_DA_OYA_NODE_ROOT": "oya_node_root",
+    "NEXVARY_DA_VOICESTUDIO_URL": "voicestudio_url",
+    "NEXVARY_DA_MONEYPRINTER_ROOT": "moneyprinter_root",
+}
 
 
 class PluginKind(StrEnum):
@@ -159,9 +168,18 @@ class PluginHub:
         self.guard = guard
         self.state = state
         self.root = Path(root).resolve(strict=True)
+        self.settings = IntegrationSettings(guard, self.root)
+
+    def _configured(self, env_name: str, default: str = "") -> str:
+        if not env_name:
+            return default
+        key = _ENV_SETTING.get(env_name)
+        if key:
+            return self.settings.get(key, env_name, default)
+        return os.environ.get(env_name, "").strip() or default
 
     def _candidate_executable(self, spec: PluginSpec) -> str | None:
-        configured = os.environ.get(spec.executable_env, "").strip() if spec.executable_env else ""
+        configured = self._configured(spec.executable_env) if spec.executable_env else ""
         if configured:
             path = Path(configured).expanduser()
             if path.is_file():
@@ -179,7 +197,7 @@ class PluginHub:
         if not spec.root_env:
             base = self.root
         else:
-            raw = os.environ.get(spec.root_env, "").strip()
+            raw = self._configured(spec.root_env)
             if not raw:
                 return None, [spec.root_env]
             candidate = Path(raw).expanduser()
@@ -221,7 +239,7 @@ class PluginHub:
 
         endpoint = None
         if spec.endpoint_env or spec.default_endpoint:
-            endpoint = os.environ.get(spec.endpoint_env, "").strip() if spec.endpoint_env else ""
+            endpoint = self._configured(spec.endpoint_env) if spec.endpoint_env else ""
             endpoint = endpoint or spec.default_endpoint or None
 
         missing_requirements.extend(self._missing_modules(spec))

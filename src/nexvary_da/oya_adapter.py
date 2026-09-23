@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from .integration_settings import IntegrationSettings
 from .permissions import Permission, WorkspaceGuard
 from .process import ProcessRunner
 from .state import ProjectState
@@ -66,14 +67,20 @@ class OyaBrowserAdapter:
         self.root = Path(root).resolve(strict=True)
 
     def _node_root(self) -> Path:
-        raw = os.environ.get("NEXVARY_DA_OYA_NODE_ROOT", "").strip()
+        raw = IntegrationSettings(self.guard, self.root).get(
+            "oya_node_root", "NEXVARY_DA_OYA_NODE_ROOT", ""
+        )
         candidate = Path(raw).expanduser() if raw else self.root
         if not candidate.is_absolute():
             candidate = self.root / candidate
         return self.guard.require(candidate, Permission.READ, must_exist=True)
 
     def status(self) -> OyaStatus:
-        node = shutil.which(os.environ.get("NEXVARY_DA_NODE_BIN", "node"))
+        node_name = IntegrationSettings(self.guard, self.root).get(
+            "node_bin", "NEXVARY_DA_NODE_BIN", "node"
+        )
+        node_path = Path(node_name).expanduser()
+        node = str(node_path.resolve()) if node_path.is_file() else shutil.which(node_name)
         try:
             base = self._node_root()
             sdk = base / "node_modules" / "@oya-ai" / "browser" / "package.json"

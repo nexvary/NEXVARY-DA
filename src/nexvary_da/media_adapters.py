@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
+from .integration_settings import IntegrationSettings
 from .permissions import Permission, WorkspaceGuard
 from .process import ProcessRunner
 from .state import ProjectState
@@ -36,8 +37,10 @@ class VoiceStudioAdapter:
         self.guard = guard
         self.state = state
         self.root = Path(root).resolve(strict=True)
-        self.base_url = os.environ.get(
-            "NEXVARY_DA_VOICESTUDIO_URL", "http://127.0.0.1:3900"
+        self.base_url = IntegrationSettings(guard, self.root).get(
+            "voicestudio_url",
+            "NEXVARY_DA_VOICESTUDIO_URL",
+            "http://127.0.0.1:3900",
         ).rstrip("/")
 
     @staticmethod
@@ -223,7 +226,9 @@ class MoneyPrinterTurboAdapter:
         self.root = Path(root).resolve(strict=True)
 
     def _project_root(self) -> Path | None:
-        raw = os.environ.get("NEXVARY_DA_MONEYPRINTER_ROOT", "").strip()
+        raw = IntegrationSettings(self.guard, self.root).get(
+            "moneyprinter_root", "NEXVARY_DA_MONEYPRINTER_ROOT", ""
+        )
         if not raw:
             return None
         candidate = Path(raw).expanduser()

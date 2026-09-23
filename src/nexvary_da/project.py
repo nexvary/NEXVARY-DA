@@ -19,6 +19,7 @@ from .errors import ConfigurationError
 from .file_tools import FileTools
 from .github_client import GitHubRESTClient
 from .git_tools import GitTools
+from .integration_settings import IntegrationSettings
 from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
 from .process_registry import ProcessRegistry
@@ -139,6 +140,9 @@ class ProjectRuntime:
 
     def checkpoints(self) -> CheckpointStore:
         return CheckpointStore(self)
+
+    def integration_settings(self) -> IntegrationSettings:
+        return IntegrationSettings(self.guard, self.root)
 
     def plugins(self) -> PluginHub:
         return PluginHub(self.guard, self.state, self.root)

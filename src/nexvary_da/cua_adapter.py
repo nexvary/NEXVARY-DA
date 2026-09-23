@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .integration_settings import IntegrationSettings
 from .permissions import Permission, WorkspaceGuard
 from .process import ProcessRunner
 from .state import ProjectState
@@ -67,9 +68,10 @@ class CuaDriverAdapter:
         self.state = state
         self.root = Path(root).resolve(strict=True)
 
-    @staticmethod
-    def _executable() -> str | None:
-        configured = os.environ.get("NEXVARY_DA_CUA_BIN", "").strip()
+    def _executable(self) -> str | None:
+        configured = IntegrationSettings(self.guard, self.root).get(
+            "cua_bin", "NEXVARY_DA_CUA_BIN", ""
+        )
         if configured:
             path = Path(configured).expanduser()
             if path.is_file():

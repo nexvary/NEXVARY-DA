@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .integration_settings import IntegrationSettings
 from .permissions import Permission, WorkspaceGuard
 from .process import ProcessRunner
 from .process_registry import ProcessRegistry
@@ -39,9 +40,10 @@ class FastMCPGateway:
         self.state = state
         self.root = Path(root).resolve(strict=True)
 
-    @staticmethod
-    def _executable() -> str | None:
-        configured = os.environ.get("NEXVARY_DA_FASTMCP_BIN", "").strip()
+    def _executable(self) -> str | None:
+        configured = IntegrationSettings(self.guard, self.root).get(
+            "fastmcp_bin", "NEXVARY_DA_FASTMCP_BIN", ""
+        )
         if configured:
             path = Path(configured).expanduser()
             if path.is_file():
