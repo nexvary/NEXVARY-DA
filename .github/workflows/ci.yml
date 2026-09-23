@@ -41,6 +41,9 @@ jobs:
       - name: Diff check
         run: git diff --check
 
+      - name: Security source and secret scan
+        run: python tests/security_scan_smoke.py
+
       - name: Dependency vulnerability audit
         run: python -m pip_audit -r security/requirements-audit.txt --strict --progress-spinner off
 
