@@ -1,20 +1,42 @@
 $ErrorActionPreference = "Stop"
-$installer = Resolve-Path "release-native\NEXVARY-DA-Setup.exe"
-& $installer /S
-if ($LASTEXITCODE -ne 0) { throw "installer failed: $LASTEXITCODE" }
+
+$installer = (Resolve-Path "release-native\NEXVARY-DA-Setup.exe").Path
+$installProcess = Start-Process -FilePath $installer -ArgumentList "/S" -Wait -PassThru
+if ($installProcess.ExitCode -ne 0) {
+    throw "installer failed: $($installProcess.ExitCode)"
+}
 
 $installDir = Join-Path $env:LOCALAPPDATA "NEXVARY\Developer Agent"
 $exe = Join-Path $installDir "NEXVARY-DA.exe"
-if (-not (Test-Path $exe)) { throw "installed executable missing: $exe" }
+if (-not (Test-Path $exe)) {
+    throw "installed executable missing: $exe"
+}
 
 $output = & $exe --help 2>&1
-if ($LASTEXITCODE -ne 0) { throw "installed executable smoke failed: $LASTEXITCODE" }
-if (($output -join "`n") -notmatch "nexvary-da") { throw "unexpected installed help output" }
+$helpExit = $LASTEXITCODE
+if ($helpExit -ne 0) {
+    throw "installed executable smoke failed: $helpExit"
+}
+if (($output -join "`n") -notmatch "nexvary-da") {
+    throw "unexpected installed help output"
+}
 
 $uninstaller = Join-Path $installDir "Uninstall.exe"
-if (-not (Test-Path $uninstaller)) { throw "uninstaller missing" }
-& $uninstaller /S
-if ($LASTEXITCODE -ne 0) { throw "uninstaller failed: $LASTEXITCODE" }
-Start-Sleep -Seconds 2
-if (Test-Path $exe) { throw "executable still exists after uninstall" }
+if (-not (Test-Path $uninstaller)) {
+    throw "uninstaller missing"
+}
+
+$uninstallProcess = Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -PassThru
+if ($uninstallProcess.ExitCode -ne 0) {
+    throw "uninstaller failed: $($uninstallProcess.ExitCode)"
+}
+
+$deadline = (Get-Date).AddSeconds(15)
+while ((Test-Path $exe) -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 250
+}
+if (Test-Path $exe) {
+    throw "executable still exists after uninstall"
+}
+
 Write-Host "NSIS install/smoke/uninstall PASS"
