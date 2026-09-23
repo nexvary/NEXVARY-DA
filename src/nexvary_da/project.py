@@ -12,10 +12,12 @@ from .file_tools import FileTools
 from .git_tools import GitTools
 from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
+from .process_registry import ProcessRegistry
 from .release_gate import ReleaseGate
 from .state import ProjectState
 from .terminal import PersistentTerminal
 from .terminal_pool import TerminalPool
+from .validation_cache import ValidationCache
 
 
 _CONFIG_DIR = ".nexvary-da"
@@ -93,6 +95,8 @@ class ProjectRuntime:
         self.git = GitTools(self.guard, self.runner, self.root)
         self.agents = AgentPool(self.state)
         self.terminals = TerminalPool(self.guard, self.root)
+        self.processes = ProcessRegistry(self.guard, self.root)
+        self.validation_cache = ValidationCache(self.root)
 
     def terminal(self) -> PersistentTerminal:
         return self.terminals.get("default")
@@ -104,5 +108,6 @@ class ProjectRuntime:
         return ReleaseGate(self.root, self.runner, self.state)
 
     def close(self) -> None:
+        self.processes.close()
         self.terminals.close_all()
         self.state.close()

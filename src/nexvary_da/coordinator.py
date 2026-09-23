@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import platform
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from .agents import AgentExecution, AgentRole, BuilderAgent, QAAgent
+from .environment import detect_project_kind
 from .goals import GoalEngine, RequirementStatus
 from .modes import ValidationPlanner, WorkMode
 from .permissions import Permission
@@ -55,6 +58,33 @@ class DevelopmentCoordinator:
         except Exception:
             return []
 
+    def _safe_commit(self) -> str | None:
+        try:
+            return self.runtime.git.commit()
+        except Exception:
+            return None
+
+    def _cache_key(self, mode: WorkMode, changed_files: list[str]) -> str | None:
+        if mode == WorkMode.RELEASE:
+            return None
+        commit = self._safe_commit()
+        if not commit and not changed_files:
+            return None
+        toolchain = json.dumps(
+            {
+                "system": platform.system(),
+                "python": platform.python_version(),
+                "kind": detect_project_kind(self.runtime.root),
+            },
+            sort_keys=True,
+        )
+        return self.runtime.validation_cache.make_key(
+            mode=mode.value,
+            changed_files=changed_files,
+            commit=commit,
+            toolchain=toolchain,
+        )
+
     def run(self, mode: WorkMode = WorkMode.ENGINEER) -> CoordinatorReport:
         changed_files = self._safe_changed_files()
         plan = ValidationPlanner.plan(mode, changed_files)
@@ -66,6 +96,44 @@ class DevelopmentCoordinator:
 
         goal = self.goals.create(f"{mode.value} verification", requirements)
         self.runtime.agents.acquire(AgentRole.COORDINATOR, goal.title)
+        plan_payload = {
+            "agents": [role.value for role in plan.agents],
+            "run_build": plan.run_build,
+            "run_related_tests": plan.run_related_tests,
+            "run_full_release_gate": plan.run_full_release_gate,
+            "clean_build": plan.clean_build,
+            "description": plan.description,
+            "cache_hit": False,
+        }
+
+        cache_key = self._cache_key(mode, changed_files)
+        if cache_key:
+            cached = self.runtime.validation_cache.get(cache_key)
+            if cached and cached.get("complete") is True:
+                build_payload = cached.get("build")
+                qa_payload = cached.get("qa")
+                goal = self.goals.record(goal.goal_id, "build", RequirementStatus.PASS, "validation cache")
+                if plan.run_related_tests:
+                    goal = self.goals.record(goal.goal_id, "qa", RequirementStatus.PASS, "validation cache")
+                self.runtime.agents.finish(AgentRole.COORDINATOR, success=goal.complete)
+                plan_payload["cache_hit"] = True
+                report = CoordinatorReport(
+                    goal_id=goal.goal_id,
+                    mode=mode.value,
+                    complete=goal.complete,
+                    changed_files=changed_files,
+                    plan=plan_payload,
+                    build=build_payload if isinstance(build_payload, dict) else None,
+                    qa=qa_payload if isinstance(qa_payload, dict) else None,
+                    release_gate=None,
+                )
+                self.runtime.state.record_event(
+                    "validation.cache.hit",
+                    {"mode": mode.value, "changed_file_count": len(changed_files)},
+                    agent=AgentRole.COORDINATOR.value,
+                )
+                self.runtime.state.set_meta("last_coordinator_run", report.to_dict())
+                return report
 
         build_payload: dict[str, Any] | None = None
         qa_payload: dict[str, Any] | None = None
@@ -75,13 +143,9 @@ class DevelopmentCoordinator:
         try:
             build = BuilderAgent(self.runtime.runner, self.runtime.root).run()
         except Exception as exc:
-            build = AgentExecution(
-                True, False, "build", reason=f"{type(exc).__name__}: {exc}"
-            )
+            build = AgentExecution(True, False, "build", reason=f"{type(exc).__name__}: {exc}")
         build_payload = self._execution_payload(build)
-        self.runtime.agents.finish(
-            AgentRole.BUILDER, success=build.supported and build.success
-        )
+        self.runtime.agents.finish(AgentRole.BUILDER, success=build.supported and build.success)
         goal = self.goals.record(
             goal.goal_id,
             "build",
@@ -94,13 +158,9 @@ class DevelopmentCoordinator:
             try:
                 qa = QAAgent(self.runtime.runner, self.runtime.root).run()
             except Exception as exc:
-                qa = AgentExecution(
-                    True, False, "qa", reason=f"{type(exc).__name__}: {exc}"
-                )
+                qa = AgentExecution(True, False, "qa", reason=f"{type(exc).__name__}: {exc}")
             qa_payload = self._execution_payload(qa)
-            self.runtime.agents.finish(
-                AgentRole.QA, success=qa.supported and qa.success
-            )
+            self.runtime.agents.finish(AgentRole.QA, success=qa.supported and qa.success)
             goal = self.goals.record(
                 goal.goal_id,
                 "qa",
@@ -111,14 +171,10 @@ class DevelopmentCoordinator:
         if plan.run_full_release_gate:
             self.runtime.agents.acquire(AgentRole.RELEASE, "release:strict-gate")
             try:
-                self.runtime.guard.require(
-                    self.runtime.root, Permission.RELEASE, must_exist=True
-                )
+                self.runtime.guard.require(self.runtime.root, Permission.RELEASE, must_exist=True)
                 gate = self.runtime.release_gate().run(strict=True)
                 gate_payload = gate.to_dict()
-                gate_status = (
-                    RequirementStatus.PASS if gate.ready else RequirementStatus.FAIL
-                )
+                gate_status = RequirementStatus.PASS if gate.ready else RequirementStatus.FAIL
                 evidence = f"ready={gate.ready}"
             except Exception as exc:
                 gate_payload = {
@@ -128,12 +184,8 @@ class DevelopmentCoordinator:
                 }
                 gate_status = RequirementStatus.FAIL
                 evidence = gate_payload["error"]
-            self.runtime.agents.finish(
-                AgentRole.RELEASE, success=bool(gate_payload.get("ready"))
-            )
-            goal = self.goals.record(
-                goal.goal_id, "release_gate", gate_status, evidence
-            )
+            self.runtime.agents.finish(AgentRole.RELEASE, success=bool(gate_payload.get("ready")))
+            goal = self.goals.record(goal.goal_id, "release_gate", gate_status, evidence)
 
         self.runtime.agents.finish(AgentRole.COORDINATOR, success=goal.complete)
         report = CoordinatorReport(
@@ -141,17 +193,20 @@ class DevelopmentCoordinator:
             mode=mode.value,
             complete=goal.complete,
             changed_files=changed_files,
-            plan={
-                "agents": [role.value for role in plan.agents],
-                "run_build": plan.run_build,
-                "run_related_tests": plan.run_related_tests,
-                "run_full_release_gate": plan.run_full_release_gate,
-                "clean_build": plan.clean_build,
-                "description": plan.description,
-            },
+            plan=plan_payload,
             build=build_payload,
             qa=qa_payload,
             release_gate=gate_payload,
         )
+        if cache_key and report.complete:
+            self.runtime.validation_cache.put(
+                cache_key,
+                {"complete": True, "build": build_payload, "qa": qa_payload},
+            )
+            self.runtime.state.record_event(
+                "validation.cache.store",
+                {"mode": mode.value, "changed_file_count": len(changed_files)},
+                agent=AgentRole.COORDINATOR.value,
+            )
         self.runtime.state.set_meta("last_coordinator_run", report.to_dict())
         return report

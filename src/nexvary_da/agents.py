@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import os
-import sys
 import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from .environment import detect_project_kind
+from .build_profiles import profile_for
 from .process import ProcessResult, ProcessRunner
 from .state import ProjectState
 
@@ -87,15 +86,28 @@ class BuilderAgent:
         self.root = Path(root).resolve(strict=True)
 
     def run(self) -> AgentExecution:
-        kind = detect_project_kind(self.root)
-        if kind == "python":
-            result = self.runner.run([sys.executable, "-m", "compileall", "-q", "src"], cwd=self.root)
-            return AgentExecution(True, result.returncode == 0, "python compile", result)
-        if kind == "gradle":
-            wrapper = "gradlew.bat" if os.name == "nt" else "./gradlew"
-            result = self.runner.run([wrapper, "assembleDebug"], cwd=self.root, timeout=900)
-            return AgentExecution(True, result.returncode == 0, "gradle assembleDebug", result)
-        return AgentExecution(False, False, "build", reason=f"No v0.1 builder adapter for {kind}")
+        profile = profile_for(self.root)
+        if profile is None:
+            return AgentExecution(False, False, "build", reason="No supported build profile detected")
+        try:
+            result = self.runner.run(
+                profile.build_command,
+                cwd=self.root,
+                timeout=profile.build_timeout,
+            )
+        except OSError as exc:
+            return AgentExecution(
+                False,
+                False,
+                f"{profile.kind} build",
+                reason=f"Build tool unavailable: {exc}",
+            )
+        return AgentExecution(
+            True,
+            result.returncode == 0,
+            f"{profile.kind} build",
+            result,
+        )
 
 
 class QAAgent:
@@ -104,18 +116,32 @@ class QAAgent:
         self.root = Path(root).resolve(strict=True)
 
     def run(self) -> AgentExecution:
-        kind = detect_project_kind(self.root)
-        if kind == "python":
-            if not (self.root / "tests").is_dir():
-                return AgentExecution(False, False, "unit tests", reason="tests/ is missing")
-            result = self.runner.run(
-                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"],
-                cwd=self.root,
-                timeout=900,
+        profile = profile_for(self.root)
+        if profile is None:
+            return AgentExecution(False, False, "qa", reason="No supported QA profile detected")
+        if profile.test_command is None:
+            return AgentExecution(
+                False,
+                False,
+                f"{profile.kind} tests",
+                reason="No test suite was detected for this project profile",
             )
-            return AgentExecution(True, result.returncode == 0, "python unittest", result)
-        if kind == "gradle":
-            wrapper = "gradlew.bat" if os.name == "nt" else "./gradlew"
-            result = self.runner.run([wrapper, "test"], cwd=self.root, timeout=900)
-            return AgentExecution(True, result.returncode == 0, "gradle test", result)
-        return AgentExecution(False, False, "qa", reason=f"No v0.1 QA adapter for {kind}")
+        try:
+            result = self.runner.run(
+                profile.test_command,
+                cwd=self.root,
+                timeout=profile.test_timeout,
+            )
+        except OSError as exc:
+            return AgentExecution(
+                False,
+                False,
+                f"{profile.kind} tests",
+                reason=f"Test tool unavailable: {exc}",
+            )
+        return AgentExecution(
+            True,
+            result.returncode == 0,
+            f"{profile.kind} tests",
+            result,
+        )
