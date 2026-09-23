@@ -10,6 +10,8 @@ from .engine_router import AgentEngine, EngineRouter
 from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime
+from .ui_easy_mode import EasyModePanel
+from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
 from .ui_terminal import TerminalPanel
 from .ui_theme import PALETTE, scale_for_screen, status_color
@@ -72,7 +74,15 @@ class DeveloperAgentUI:
         ident = tk.Frame(header, bg=PALETTE.surface); ident.pack(side="left", padx=self.px(10))
         self.label(ident, self.runtime.config.name, size=11, bold=True).pack(anchor="w")
         self.label(ident, f"{self.repo} / {self.branch} / {self.commit}", size=7, fg=PALETTE.muted).pack(anchor="w")
-        rail = tk.Frame(header, bg=PALETTE.surface); rail.pack(side="right", padx=self.px(14))
+
+        self.experience = tk.StringVar(value=self.runtime.state.get_meta("ui.experience", "easy"))
+        if self.experience.get() not in {"easy", "advanced"}:
+            self.experience.set("easy")
+        view = tk.Frame(header, bg=PALETTE.surface); view.pack(side="right", padx=(0, self.px(10)))
+        self.button(view, "EASY", lambda: self.show_experience("easy"), accent=True).pack(side="left", pady=self.px(19), padx=self.px(2))
+        self.button(view, "ADVANCED", lambda: self.show_experience("advanced")).pack(side="left", pady=self.px(19), padx=self.px(2))
+
+        rail = tk.Frame(header, bg=PALETTE.surface); rail.pack(side="right", padx=self.px(6))
         self.status = {k: tk.StringVar(value=v) for k, v in {"files":"FILES CLEAN","build":"BUILD —","qa":"QA —","ready":"READY —"}.items()}
         self.status_labels = {}
         for key in self.status:
@@ -80,17 +90,98 @@ class DeveloperAgentUI:
                          padx=self.px(8), pady=self.px(4), font=(self.font, self.px(7), "bold"))
             x.pack(side="left", padx=self.px(2), pady=self.px(20)); self.status_labels[key] = x
 
-        shell = tk.PanedWindow(self.window, orient="horizontal", bg=PALETTE.background, sashwidth=6, bd=0, showhandle=False)
+        self.easy_body = self.card(self.window)
+        self.easy_panel = EasyModePanel(self.easy_body, self)
+
+        self.advanced_body = tk.Frame(self.window, bg=PALETTE.background)
+        shell = tk.PanedWindow(self.advanced_body, orient="horizontal", bg=PALETTE.background, sashwidth=6, bd=0, showhandle=False)
         shell.pack(fill="both", expand=True, padx=self.px(10), pady=self.px(9))
         left, center, right = self.card(shell), self.card(shell), self.card(shell)
         shell.add(left, minsize=210, width=self.px(250)); shell.add(center, minsize=560); shell.add(right, minsize=245, width=self.px(290))
         self._build_projects(left); self._build_center(center); self._build_agents(right)
-        self.term = TerminalPanel(self.window, terminal=self.terminal, font_family=self.font, mono_family=self.mono, scale=self.scale)
+        self.term = TerminalPanel(self.advanced_body, terminal=self.terminal, font_family=self.font, mono_family=self.mono, scale=self.scale)
         self.term.frame.pack(fill="x", padx=self.px(10), pady=(0, self.px(10)))
+
+        self.show_experience(self.experience.get())
         self.window.bind("<Control-Return>", lambda _e: self.run_verification())
         self.window.bind("<F5>", lambda _e: self.run_verification())
-        self.window.bind("<Control-l>", lambda _e: self.term.entry.focus_set())
+        self.window.bind("<Control-l>", lambda _e: (self.show_experience("advanced"), self.term.entry.focus_set()))
         self.window.bind("<Control-k>", lambda _e: self.clear_log())
+
+    def show_experience(self, mode: str) -> None:
+        selected = "advanced" if mode == "advanced" else "easy"
+        self.experience.set(selected)
+        self.easy_body.pack_forget()
+        self.advanced_body.pack_forget()
+        if selected == "easy":
+            self.easy_body.pack(fill="both", expand=True, padx=self.px(10), pady=self.px(10))
+            self.easy_panel.refresh()
+        else:
+            self.advanced_body.pack(fill="both", expand=True)
+
+    def open_integrations(self) -> None:
+        open_integration_center(
+            self.window,
+            self.runtime,
+            font_family=self.font,
+            scale=self.scale,
+            on_change=self.refresh_all_integrations,
+        )
+
+    def refresh_all_integrations(self) -> None:
+        self.refresh_integrations()
+        if hasattr(self, "easy_panel"):
+            self.easy_panel.refresh()
+
+    def run_quick_check(self) -> None:
+        self.mode.set(WorkMode.ENGINEER.value)
+        self.easy_panel.set_message("Running build and tests. You can keep using Easy Mode.")
+        self.run_verification()
+
+    def plan_task_easy(self) -> None:
+        from tkinter import simpledialog
+
+        goal = simpledialog.askstring(
+            "Start a task",
+            "Describe what you want to achieve:",
+            parent=self.window,
+        )
+        if not goal or not goal.strip():
+            return
+        engine = (
+            AgentEngine.HYBRID
+            if self.runtime.zcode().status(probe_version=False).available
+            else AgentEngine.NATIVE
+        )
+        mode = WorkMode.ENGINEER
+        self.engine.set(engine.value)
+        self.mode.set(mode.value)
+        self.runtime.state.set_meta("ui.engine", engine.value)
+        self.easy_panel.set_message(
+            f"Planning with the best available engine ({engine.value}). No technical choice is required."
+        )
+
+        def worker():
+            try:
+                report = EngineRouter(self.runtime).plan(goal, engine=engine, mode=mode)
+                def done():
+                    summary = report.native["validation"]["description"]
+                    if report.zcode and report.zcode.get("success"):
+                        zplan = report.zcode.get("plan") or {}
+                        summary = zplan.get("summary") or summary
+                    elif report.zcode and not report.zcode.get("success"):
+                        summary += " • ZCode was unavailable, native plan remains available."
+                    self.easy_panel.set_message(f"Plan ready: {summary}")
+                    self.append(f"[EASY TASK] {goal.strip()} • {summary}")
+                self.window.after(0, done)
+            except Exception as exc:
+                self.window.after(
+                    0,
+                    lambda: self.easy_panel.set_message(
+                        f"Could not create the plan: {type(exc).__name__}: {exc}"
+                    ),
+                )
+        threading.Thread(target=worker, daemon=True).start()
 
     def _build_projects(self, parent) -> None:
         tk = self.tk
@@ -210,9 +301,22 @@ class DeveloperAgentUI:
                     self.summary["gate"].set("PASS" if report.release_gate and report.release_gate.get("ready") else ("BLOCKED" if report.release_gate else "NOT REQUESTED"))
                     self.append(f"[{selected.value.upper()}] {'PASS' if report.complete else 'NOT COMPLETE'} • {len(report.changed_files)} changed file(s)" + (" • cache hit" if report.plan.get("cache_hit") else ""))
                     self.refresh_agents(); self.run_button.configure(state="normal")
+                    if hasattr(self, "easy_panel"):
+                        self.easy_panel.set_message(
+                            "Build and tests passed." if report.complete else "Checks finished. Some items still need attention."
+                        )
+                        self.easy_panel.refresh()
                 self.window.after(0,done)
             except Exception as exc:
-                self.window.after(0,lambda:(self.append(f"VERIFICATION ERROR • {type(exc).__name__}: {exc}"),self.set_status("ready","READY NO","BLOCKED"),self.run_button.configure(state="normal")))
+                self.window.after(
+                    0,
+                    lambda: (
+                        self.append(f"VERIFICATION ERROR • {type(exc).__name__}: {exc}"),
+                        self.set_status("ready","READY NO","BLOCKED"),
+                        self.run_button.configure(state="normal"),
+                        self.easy_panel.set_message(f"Check failed: {type(exc).__name__}: {exc}") if hasattr(self, "easy_panel") else None,
+                    ),
+                )
         threading.Thread(target=worker,daemon=True).start()
 
     def plan_task(self)->None:
@@ -259,12 +363,17 @@ class DeveloperAgentUI:
     def add_project(self)->None:
         def imported(p):
             self.plist.insert("end",f"●  {p.name}"); self.append(f"PROJECT READY • {p.path} • {'reused' if p.reused_existing_clone else 'cloned'} • {p.project_kind}")
+            if hasattr(self, "easy_panel"):
+                self.easy_panel.set_message(f"Project ready: {p.name}")
+                self.easy_panel.refresh()
         open_add_project_dialog(self.window,runtime=self.runtime,font_family=self.font,scale=self.scale,append=self.append,on_imported=imported)
 
     def _poll_changes(self)->None:
         try:
             delta=self.tracker.poll(); changed=list(delta.changed) if delta.changed else self.runtime.git.changed_files(); n=len(changed)
             self.summary["changes"].set(str(n)); self.set_status("files","FILES CLEAN" if not n else f"FILES {n}","PASS" if not n else "RUNNING")
+            if hasattr(self, "easy_panel"):
+                self.easy_panel.project_var.set("Ready" if not n else f"{n} changed file(s)")
             if delta.changed: self.runtime.state.record_event("workspace.files.changed",{"count":n,"paths":changed[:100]})
         except Exception:
             pass
@@ -276,4 +385,9 @@ class DeveloperAgentUI:
         if isinstance(last,dict) and last.get("complete"): self.set_status("ready","READY YES","READY")
 
     def close(self)->None:
-        self.runtime.state.set_meta("ui.geometry",self.window.geometry()); self.runtime.state.set_meta("ui.mode",self.mode.get()); self.runtime.state.set_meta("ui.engine",self.engine.get()); self.runtime.close(); self.window.destroy()
+        self.runtime.state.set_meta("ui.geometry",self.window.geometry())
+        self.runtime.state.set_meta("ui.mode",self.mode.get())
+        self.runtime.state.set_meta("ui.engine",self.engine.get())
+        self.runtime.state.set_meta("ui.experience",self.experience.get())
+        self.runtime.close()
+        self.window.destroy()
