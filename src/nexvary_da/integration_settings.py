@@ -25,6 +25,8 @@ _ALLOWED_DEFAULTS: dict[str, str] = {
     "product_ad_currency": "EGP",
     "product_ad_voice": "ar-EG-SalmaNeural",
     "product_ad_duration": "60",
+    "product_ad_video_role": "camera_sample",
+    "product_ad_video_audio": "duck",
     "qwen_model": "Qwen/Qwen-Image-2.1",
     "qwen_device": "cuda",
 }
