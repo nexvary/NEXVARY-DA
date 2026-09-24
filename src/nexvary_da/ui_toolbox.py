@@ -18,19 +18,25 @@ class ToolBox:
         ("MCP", "Start an MCP tool server"),
     )
 
-    def __init__(self, parent, runtime, *, font_family: str, scale: float):
+    def __init__(self, parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None):
         import tkinter as tk
 
         self.tk = tk
         self.runtime = runtime
         self.font = font_family
         self.scale = scale
-        self.window = tk.Toplevel(parent)
-        self.window.title("NEXVARY — Tool Box")
-        self.window.configure(bg=PALETTE.background)
-        self.window.geometry("1020x720")
-        self.window.minsize(900, 640)
-        self.window.transient(parent)
+        self.embedded = bool(embedded)
+        self.on_back = on_back
+        if self.embedded:
+            self.window = tk.Frame(parent, bg=PALETTE.background)
+            self.window.pack(fill="both", expand=True)
+        else:
+            self.window = tk.Toplevel(parent)
+            self.window.title("NEXVARY — Tool Box")
+            self.window.configure(bg=PALETTE.background)
+            self.window.geometry("1020x720")
+            self.window.minsize(900, 640)
+            self.window.transient(parent)
         self.category = tk.StringVar(value="Desktop")
         self.output_var = tk.StringVar(value="Ready")
         self.widgets: dict[str, object] = {}
@@ -117,9 +123,15 @@ class ToolBox:
             wraplength=self.px(760),
             font=(self.font, self.px(8)),
         ).pack(side="left", fill="x", expand=True, padx=self.px(16), pady=self.px(10))
-        self.button(bottom, "CLOSE", self.window.destroy).pack(
+        self.button(bottom, "BACK / رجوع", self.close).pack(
             side="right", padx=self.px(8), pady=self.px(8)
         )
+
+    def close(self):
+        if callable(self.on_back):
+            self.on_back()
+            return
+        self.window.destroy()
 
     def _clear(self):
         for child in self.right.winfo_children():
@@ -351,5 +363,12 @@ class ToolBox:
         ).pack(anchor="e", pady=self.px(12))
 
 
-def open_toolbox(parent, runtime, *, font_family: str, scale: float):
-    return ToolBox(parent, runtime, font_family=font_family, scale=scale)
+def open_toolbox(parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None):
+    return ToolBox(
+        parent,
+        runtime,
+        font_family=font_family,
+        scale=scale,
+        embedded=embedded,
+        on_back=on_back,
+    )
