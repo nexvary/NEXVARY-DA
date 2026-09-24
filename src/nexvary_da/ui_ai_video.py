@@ -294,6 +294,12 @@ class AIVideoManagerPanel:
         canvas.itemconfigure(body_window, width=requested_width, height=requested_height)
         canvas.configure(scrollregion=canvas.bbox("all"))
 
+        body.update_idletasks()
+        content_height = max(self.px(900), int(body.winfo_reqheight()))
+        body.configure(height=content_height)
+        canvas.itemconfigure(body_window, height=content_height)
+        canvas.configure(scrollregion=(0, 0, max(self.px(900), int(body.winfo_reqwidth())), content_height))
+
         footer = tk.Frame(self.window, bg=PALETTE.surface)
         footer.pack(fill="x")
         tk.Label(
