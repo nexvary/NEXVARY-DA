@@ -24,6 +24,7 @@ from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
 from .process_registry import ProcessRegistry
 from .plan_execution import PlanExecutionManager
+from .product_ad import ProductAdComposer
 from .release_gate import ReleaseGate
 from .state import ProjectState
 from .terminal import PersistentTerminal
@@ -180,6 +181,9 @@ class ProjectRuntime:
             self.state,
             self.root,
         )
+
+    def product_ads(self) -> ProductAdComposer:
+        return ProductAdComposer(self.guard, self.state, self.root)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)

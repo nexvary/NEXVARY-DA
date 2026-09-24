@@ -22,6 +22,9 @@ _ALLOWED_DEFAULTS: dict[str, str] = {
     "video_duration": "60",
     "video_aspect": "9:16",
     "video_language": "ar",
+    "product_ad_currency": "EGP",
+    "product_ad_voice": "ar-EG-SalmaNeural-Female",
+    "product_ad_duration": "60",
     "qwen_model": "Qwen/Qwen-Image-2.1",
     "qwen_device": "cuda",
 }
