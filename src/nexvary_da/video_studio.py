@@ -336,6 +336,14 @@ class VideoStudioManager:
         video_source: str = "pexels",
         voice_name: str = "",
         video_materials: str = "",
+        transition_mode: str = "",
+        concat_mode: str = "",
+        clip_duration: int | None = None,
+        bgm_type: str = "",
+        subtitle_enabled: bool | None = None,
+        subtitle_display_mode: str = "",
+        subtitle_animation: str = "",
+        voice_rate: float | None = None,
         timeout: float = 3600,
     ) -> dict[str, Any]:
         spec = self.spec(VideoEngineId.MONEYPRINTER)
@@ -379,6 +387,24 @@ class VideoStudioManager:
             raise ValueError("Local materials can only be used with local source mode")
         if voice_name.strip():
             args.extend(["--voice-name", voice_name.strip()])
+        if transition_mode:
+            args.extend(["--video-transition-mode", transition_mode])
+        if concat_mode:
+            args.extend(["--video-concat-mode", concat_mode])
+        if clip_duration is not None:
+            args.extend(["--video-clip-duration", str(int(clip_duration))])
+        if bgm_type:
+            args.extend(["--bgm-type", bgm_type])
+        if subtitle_enabled is True:
+            args.append("--subtitle-enabled")
+        elif subtitle_enabled is False:
+            args.append("--no-subtitle-enabled")
+        if subtitle_display_mode:
+            args.extend(["--subtitle-display-mode", subtitle_display_mode])
+        if subtitle_animation:
+            args.extend(["--subtitle-animation", subtitle_animation])
+        if voice_rate is not None:
+            args.extend(["--voice-rate", str(float(voice_rate))])
 
         result = self.runner.run(args, cwd=root, timeout=timeout)
         self.state.record_event(
@@ -393,6 +419,10 @@ class VideoStudioManager:
                 "local_material_count": len([x for x in video_materials.split(",") if x.strip()]),
                 "subject_chars": len(subject),
                 "script_chars": len(script),
+                "transition": transition_mode,
+                "concat": concat_mode,
+                "bgm_type": bgm_type,
+                "subtitle_enabled": subtitle_enabled,
             },
             agent="Video Studio",
         )

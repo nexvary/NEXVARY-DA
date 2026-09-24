@@ -1,0 +1,387 @@
+from __future__ import annotations
+
+import threading
+
+from .product_ad import ProductAdBrief, build_arabic_product_script
+from .ui_theme import PALETTE
+from .video_studio import VideoEngineId
+
+
+class ProductAdWindow:
+    """Arabic-first product advertisement workflow backed by MoneyPrinterTurbo."""
+
+    def __init__(self, parent, runtime, *, font_family: str, scale: float):
+        import tkinter as tk
+        from tkinter import filedialog
+
+        self.tk = tk
+        self.filedialog = filedialog
+        self.runtime = runtime
+        self.manager = runtime.video_studio()
+        self.composer = runtime.product_ads()
+        self.font = font_family
+        self.scale = scale
+        self.window = tk.Toplevel(parent)
+        self.window.title("NEXVARY — إعلان منتج")
+        self.window.configure(bg=PALETTE.background)
+        self.window.geometry(f"{self.px(1180)}x{self.px(820)}")
+        self.window.minsize(self.px(980), self.px(720))
+        self.window.transient(parent)
+
+        settings = runtime.integration_settings().load()
+        self.product_name_var = tk.StringVar(value="")
+        self.model_var = tk.StringVar(value="")
+        self.price_var = tk.StringVar(value="")
+        self.currency_var = tk.StringVar(value=settings.get("product_ad_currency", "EGP"))
+        self.contact_var = tk.StringVar(value="")
+        self.duration_var = tk.StringVar(value=settings.get("product_ad_duration", "60"))
+        self.voice_var = tk.StringVar(value=settings.get("product_ad_voice", "ar-EG-SalmaNeural"))
+        self.music_var = tk.StringVar(value="random")
+        self.status_var = tk.StringVar(value="أدخل بيانات المنتج وأضف الصور ثم اضغط معاينة النص.")
+        self.images_var = tk.StringVar(value="لم يتم اختيار صور")
+        self.selected_images: list[str] = []
+        self.details_box = None
+        self.script_preview = None
+        self._build()
+
+    def px(self, value: int) -> int:
+        return max(1, int(round(value * self.scale)))
+
+    def label(self, parent, text: str, *, size=9, fg=None, bold=False, rtl=True):
+        return self.tk.Label(
+            parent,
+            text=text,
+            bg=parent.cget("bg"),
+            fg=fg or PALETTE.text,
+            anchor="e" if rtl else "w",
+            justify="right" if rtl else "left",
+            font=(self.font, self.px(size), "bold" if bold else "normal"),
+        )
+
+    def button(self, parent, text: str, command, *, accent=False):
+        return self.tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=PALETTE.action if accent else PALETTE.surface_alt,
+            fg=PALETTE.background if accent else PALETTE.action,
+            activebackground=PALETTE.action_hover,
+            activeforeground=PALETTE.background,
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.silver_bright,
+            padx=self.px(11),
+            pady=self.px(7),
+            font=(self.font, self.px(8), "bold"),
+        )
+
+    def _entry(self, parent, variable, title: str, color: str):
+        self.label(parent, title, size=8, fg=color, bold=True).pack(fill="x", pady=(self.px(7), self.px(3)))
+        entry = self.tk.Entry(
+            parent,
+            textvariable=variable,
+            justify="right",
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.text,
+            insertbackground=PALETTE.action,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=color,
+            font=(self.font, self.px(9)),
+        )
+        entry.pack(fill="x", ipady=self.px(6))
+        return entry
+
+    def _choice(self, parent, title: str, variable, choices, color: str):
+        self.label(parent, title, size=8, fg=color, bold=True).pack(fill="x", pady=(self.px(8), self.px(3)))
+        row = self.tk.Frame(parent, bg=PALETTE.surface_alt)
+        row.pack(fill="x")
+        for label, value in choices:
+            self.tk.Radiobutton(
+                row,
+                text=label,
+                variable=variable,
+                value=value,
+                indicatoron=False,
+                bg=PALETTE.surface_alt,
+                fg=PALETTE.text,
+                selectcolor=color,
+                activebackground=PALETTE.surface_glow,
+                activeforeground=PALETTE.text,
+                relief="flat",
+                bd=0,
+                padx=self.px(7),
+                pady=self.px(5),
+                font=(self.font, self.px(7), "bold"),
+            ).pack(side="right", fill="x", expand=True, padx=1, pady=1)
+
+    def _build(self):
+        tk = self.tk
+        header = tk.Frame(
+            self.window,
+            bg=PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        header.pack(fill="x")
+        tk.Frame(header, bg=PALETTE.magenta, height=self.px(3)).pack(fill="x")
+        self.label(header, "إعلان منتج / PRODUCT AD", size=17, fg=PALETTE.magenta, bold=True).pack(
+            fill="x", padx=self.px(18), pady=(self.px(12), 0)
+        )
+        self.label(
+            header,
+            "صور المنتج + الموديل + السعر + التفاصيل → تعليق صوتي عربي → فيديو إعلان عمودي",
+            size=8,
+            fg=PALETTE.muted,
+        ).pack(fill="x", padx=self.px(18), pady=(0, self.px(12)))
+
+        body = tk.Frame(self.window, bg=PALETTE.background)
+        body.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(10))
+        left = tk.Frame(
+            body,
+            bg=PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        right = tk.Frame(
+            body,
+            bg=PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        left.pack(side="right", fill="both", expand=True, padx=(self.px(5), 0))
+        right.pack(side="left", fill="y", padx=(0, self.px(5)))
+
+        content = tk.Frame(left, bg=PALETTE.surface)
+        content.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(12))
+        self._entry(content, self.product_name_var, "اسم المنتج", PALETTE.cyan)
+        self._entry(content, self.model_var, "رقم / اسم الموديل", PALETTE.purple)
+
+        price_row = tk.Frame(content, bg=PALETTE.surface)
+        price_row.pack(fill="x")
+        price_side = tk.Frame(price_row, bg=PALETTE.surface)
+        currency_side = tk.Frame(price_row, bg=PALETTE.surface)
+        price_side.pack(side="right", fill="x", expand=True, padx=(self.px(5), 0))
+        currency_side.pack(side="left", fill="x", expand=True, padx=(0, self.px(5)))
+        self._entry(price_side, self.price_var, "سعر البيع", PALETTE.action)
+        self._choice(
+            currency_side,
+            "العملة",
+            self.currency_var,
+            (("جنيه", "EGP"), ("درهم", "AED"), ("ريال", "SAR"), ("دولار", "USD")),
+            PALETTE.gold,
+        )
+
+        self.label(content, "الوصف والنقاط التي تريد أن يتكلم عنها الإعلان", size=8, fg=PALETTE.magenta, bold=True).pack(
+            fill="x", pady=(self.px(8), self.px(3))
+        )
+        self.details_box = tk.Text(
+            content,
+            height=7,
+            wrap="word",
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.text,
+            insertbackground=PALETTE.action,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            highlightcolor=PALETTE.magenta,
+            font=(self.font, self.px(9)),
+        )
+        self.details_box.pack(fill="both", expand=True)
+        self._entry(content, self.contact_var, "رقم الهاتف / طريقة التواصل — اختياري", PALETTE.yellow)
+
+        photos = tk.Frame(content, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
+        photos.pack(fill="x", pady=(self.px(10), 0))
+        self.label(photos, "صور المنتج", size=8, fg=PALETTE.cyan, bold=True).pack(
+            side="right", padx=self.px(8), pady=self.px(8)
+        )
+        tk.Label(
+            photos,
+            textvariable=self.images_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.muted,
+            anchor="e",
+            font=(self.font, self.px(7)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
+        self.button(photos, "إضافة صور", self.choose_images, accent=True).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+        self.button(photos, "مسح", self.clear_images).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+
+        controls = tk.Frame(right, bg=PALETTE.surface)
+        controls.pack(fill="both", expand=True, padx=self.px(12), pady=self.px(12))
+        self._choice(
+            controls,
+            "مدة الإعلان المستهدفة",
+            self.duration_var,
+            (("30 ث", "30"), ("45 ث", "45"), ("60 ث", "60"), ("90 ث", "90")),
+            PALETTE.orange,
+        )
+        self._choice(
+            controls,
+            "الصوت العربي",
+            self.voice_var,
+            (("سلمى", "ar-EG-SalmaNeural"), ("شاكر", "ar-EG-ShakirNeural")),
+            PALETTE.cyan,
+        )
+        self._choice(
+            controls,
+            "موسيقى خلفية",
+            self.music_var,
+            (("عشوائية", "random"), ("بدون", "none")),
+            PALETTE.purple,
+        )
+
+        self.label(controls, "معاينة النص الذي سيُقال", size=8, fg=PALETTE.magenta, bold=True).pack(
+            fill="x", pady=(self.px(10), self.px(3))
+        )
+        self.script_preview = tk.Text(
+            controls,
+            width=37,
+            height=15,
+            wrap="word",
+            bg=PALETTE.terminal,
+            fg=PALETTE.text,
+            insertbackground=PALETTE.action,
+            relief="flat",
+            bd=0,
+            state="disabled",
+            font=(self.font, self.px(8)),
+        )
+        self.script_preview.pack(fill="both", expand=True)
+        self.button(controls, "معاينة النص", self.preview_script).pack(fill="x", pady=(self.px(8), self.px(3)))
+        self.button(controls, "إنشاء الإعلان", self.create_ad, accent=True).pack(fill="x", pady=self.px(3))
+
+        footer = tk.Frame(self.window, bg=PALETTE.surface)
+        footer.pack(fill="x")
+        tk.Label(
+            footer,
+            textvariable=self.status_var,
+            bg=PALETTE.surface,
+            fg=PALETTE.cyan,
+            anchor="e",
+            justify="right",
+            wraplength=self.px(900),
+            font=(self.font, self.px(8)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(14), pady=self.px(9))
+        self.button(footer, "رجوع", self.window.destroy, accent=True).pack(
+            side="left", padx=self.px(10), pady=self.px(7)
+        )
+
+    def choose_images(self):
+        files = self.filedialog.askopenfilenames(
+            parent=self.window,
+            title="اختر صور المنتج",
+            filetypes=[
+                ("Product images", "*.jpg *.jpeg *.png *.webp *.bmp"),
+                ("All files", "*.*"),
+            ],
+        )
+        if files:
+            self.selected_images = list(files)
+            self.images_var.set(f"{len(self.selected_images)} صورة مختارة")
+
+    def clear_images(self):
+        self.selected_images = []
+        self.images_var.set("لم يتم اختيار صور")
+
+    def _brief(self) -> ProductAdBrief:
+        details = self.details_box.get("1.0", "end").strip() if self.details_box is not None else ""
+        return ProductAdBrief(
+            product_name=self.product_name_var.get(),
+            model=self.model_var.get(),
+            price=self.price_var.get(),
+            currency=self.currency_var.get(),
+            details=details,
+            contact=self.contact_var.get(),
+            target_seconds=int(self.duration_var.get()),
+        ).normalized()
+
+    def preview_script(self):
+        try:
+            script = build_arabic_product_script(self._brief())
+            if self.script_preview is not None:
+                self.script_preview.configure(state="normal")
+                self.script_preview.delete("1.0", "end")
+                self.script_preview.insert("1.0", script.text)
+                self.script_preview.configure(state="disabled")
+            note = f"النص حوالي {script.estimated_seconds} ثانية ({script.word_count} كلمة)."
+            if script.needs_more_details:
+                note += " البيانات الحالية قصيرة بالنسبة للمدة المختارة؛ أضف تفاصيل إذا أردت الاقتراب من المدة كاملة."
+            self.status_var.set(note)
+        except Exception as exc:
+            self.status_var.set(f"تعذر تجهيز النص: {type(exc).__name__}: {exc}")
+
+    def _background(self, label: str, function):
+        self.status_var.set(label + "…")
+        def worker():
+            try:
+                result = function()
+                def done():
+                    if result.get("returncode", 0) == 0:
+                        self.status_var.set("تم إنشاء الإعلان بنجاح. راجع ملفات MoneyPrinterTurbo الناتجة.")
+                    else:
+                        self.status_var.set("انتهى المحرك بخطأ. افتح Advanced Mode لعرض التفاصيل.")
+                self.window.after(0, done)
+            except Exception as exc:
+                self.window.after(
+                    0,
+                    lambda: self.status_var.set(f"فشل إنشاء الإعلان: {type(exc).__name__}: {exc}"),
+                )
+        threading.Thread(target=worker, daemon=True).start()
+
+    def create_ad(self):
+        try:
+            brief = self._brief()
+            script = build_arabic_product_script(brief)
+            if not self.selected_images:
+                raise ValueError("أضف صورة واحدة على الأقل للمنتج")
+            self.runtime.integration_settings().save(
+                {
+                    "product_ad_currency": brief.currency,
+                    "product_ad_voice": self.voice_var.get(),
+                    "product_ad_duration": str(brief.target_seconds),
+                }
+            )
+        except Exception as exc:
+            self.status_var.set(f"راجع البيانات: {type(exc).__name__}: {exc}")
+            return
+
+        def work():
+            status = self.manager.status(VideoEngineId.MONEYPRINTER)
+            if not status.ready:
+                self.manager.prepare(VideoEngineId.MONEYPRINTER)
+            imported = self.composer.import_selected_images(self.selected_images)
+            frames = self.composer.render_frames(imported, brief)
+            materials = ",".join(str(path) for path in frames)
+            return self.manager.create_moneyprinter(
+                subject=brief.product_name or brief.model,
+                script=script.text,
+                duration_seconds=brief.target_seconds,
+                aspect="9:16",
+                language="ar-EG",
+                video_source="local",
+                voice_name=self.voice_var.get(),
+                video_materials=materials,
+                transition_mode="fade-in",
+                concat_mode="sequential",
+                clip_duration=6,
+                bgm_type=self.music_var.get(),
+                subtitle_enabled=False,
+                voice_rate=1.02,
+            )
+
+        self._background("يتم تجهيز الصور والصوت وإنشاء الإعلان", work)
+
+
+def open_product_ad(parent, runtime, *, font_family: str, scale: float) -> ProductAdWindow:
+    return ProductAdWindow(parent, runtime, font_family=font_family, scale=scale)
