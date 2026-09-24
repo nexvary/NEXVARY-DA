@@ -37,9 +37,12 @@ class ProductAdWindow:
         self.duration_var = tk.StringVar(value=settings.get("product_ad_duration", "60"))
         self.voice_var = tk.StringVar(value=settings.get("product_ad_voice", "ar-EG-SalmaNeural"))
         self.music_var = tk.StringVar(value="random")
-        self.status_var = tk.StringVar(value="أدخل بيانات المنتج وأضف الصور ثم اضغط معاينة النص.")
+        self.status_var = tk.StringVar(value="أدخل بيانات المنتج وأضف الصور والفيديو الحقيقي ثم اضغط معاينة النص.")
         self.images_var = tk.StringVar(value="لم يتم اختيار صور")
+        self.videos_var = tk.StringVar(value="لم يتم اختيار فيديو حقيقي")
+        self.research_var = tk.BooleanVar(value=True)
         self.selected_images: list[str] = []
+        self.selected_videos: list[str] = []
         self.details_box = None
         self.script_preview = None
         self._build()
@@ -217,6 +220,26 @@ class ProductAdWindow:
             side="left", padx=self.px(5), pady=self.px(5)
         )
 
+        videos = tk.Frame(content, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
+        videos.pack(fill="x", pady=(self.px(7), 0))
+        self.label(videos, "فيديو تشغيل / عينة حقيقية", size=8, fg=PALETTE.orange, bold=True).pack(
+            side="right", padx=self.px(8), pady=self.px(8)
+        )
+        tk.Label(
+            videos,
+            textvariable=self.videos_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.muted,
+            anchor="e",
+            font=(self.font, self.px(7)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
+        self.button(videos, "إضافة فيديو", self.choose_videos, accent=True).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+        self.button(videos, "مسح", self.clear_videos).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+
         controls = tk.Frame(right, bg=PALETTE.surface)
         controls.pack(fill="both", expand=True, padx=self.px(12), pady=self.px(12))
         self._choice(
@@ -240,6 +263,23 @@ class ProductAdWindow:
             (("عشوائية", "random"), ("بدون", "none")),
             PALETTE.purple,
         )
+
+        tk.Checkbutton(
+            controls,
+            text="ابحث عن الشركة والموديل وأضف فقط المعلومات التي تم التحقق منها",
+            variable=self.research_var,
+            onvalue=True,
+            offvalue=False,
+            bg=PALETTE.surface,
+            fg=PALETTE.action,
+            selectcolor=PALETTE.surface_alt,
+            activebackground=PALETTE.surface,
+            activeforeground=PALETTE.action,
+            anchor="e",
+            justify="right",
+            wraplength=self.px(320),
+            font=(self.font, self.px(8), "bold"),
+        ).pack(fill="x", pady=(self.px(10), self.px(3)))
 
         self.label(controls, "معاينة النص الذي سيُقال", size=8, fg=PALETTE.magenta, bold=True).pack(
             fill="x", pady=(self.px(10), self.px(3))
@@ -294,6 +334,23 @@ class ProductAdWindow:
         self.selected_images = []
         self.images_var.set("لم يتم اختيار صور")
 
+    def choose_videos(self):
+        files = self.filedialog.askopenfilenames(
+            parent=self.window,
+            title="اختر فيديو التشغيل أو العينة الحقيقية",
+            filetypes=[
+                ("Product videos", "*.mp4 *.mov *.mkv *.avi *.webm *.m4v"),
+                ("All files", "*.*"),
+            ],
+        )
+        if files:
+            self.selected_videos = list(files)
+            self.videos_var.set(f"{len(self.selected_videos)} فيديو حقيقي مختار")
+
+    def clear_videos(self):
+        self.selected_videos = []
+        self.videos_var.set("لم يتم اختيار فيديو حقيقي")
+
     def _brief(self) -> ProductAdBrief:
         details = self.details_box.get("1.0", "end").strip() if self.details_box is not None else ""
         return ProductAdBrief(
@@ -308,7 +365,10 @@ class ProductAdWindow:
 
     def preview_script(self):
         try:
-            script = build_arabic_product_script(self._brief())
+            script = build_arabic_product_script(
+                self._brief(),
+                real_video_count=len(self.selected_videos),
+            )
             if self.script_preview is not None:
                 self.script_preview.configure(state="normal")
                 self.script_preview.delete("1.0", "end")
@@ -328,7 +388,13 @@ class ProductAdWindow:
                 result = function()
                 def done():
                     if result.get("returncode", 0) == 0:
-                        self.status_var.set("تم إنشاء الإعلان بنجاح. راجع ملفات MoneyPrinterTurbo الناتجة.")
+                        sources = int(result.get("research_sources", 0))
+                        facts = int(result.get("verified_facts", 0))
+                        real_videos = int(result.get("real_videos", 0))
+                        self.status_var.set(
+                            f"تم إنشاء الإعلان بنجاح • فيديو حقيقي: {real_videos} • "
+                            f"مصادر بحث: {sources} • حقائق موثقة: {facts}"
+                        )
                     else:
                         self.status_var.set("انتهى المحرك بخطأ. افتح Advanced Mode لعرض التفاصيل.")
                 self.window.after(0, done)
@@ -342,7 +408,6 @@ class ProductAdWindow:
     def create_ad(self):
         try:
             brief = self._brief()
-            script = build_arabic_product_script(brief)
             if not self.selected_images:
                 raise ValueError("أضف صورة واحدة على الأقل للمنتج")
             self.runtime.integration_settings().save(
@@ -360,10 +425,30 @@ class ProductAdWindow:
             status = self.manager.status(VideoEngineId.MONEYPRINTER)
             if not status.ready:
                 self.manager.prepare(VideoEngineId.MONEYPRINTER)
+
             imported = self.composer.import_selected_images(self.selected_images)
             frames = self.composer.render_frames(imported, brief)
-            materials = ",".join(str(path) for path in frames)
-            return self.manager.create_moneyprinter(
+            real_videos = self.composer.import_selected_videos(self.selected_videos)
+
+            report = None
+            verified_facts: tuple[str, ...] = ()
+            if self.research_var.get():
+                report = self.runtime.product_research().research(
+                    brief.product_name,
+                    brief.model,
+                )
+                verified_facts = tuple(item.arabic for item in report.verified_facts)
+
+            research_cards = self.composer.render_research_cards(brief, verified_facts)
+            script = build_arabic_product_script(
+                brief,
+                real_video_count=len(real_videos),
+                verified_facts=verified_facts,
+            )
+
+            ordered_materials = [*frames, *real_videos, *research_cards]
+            materials = ",".join(str(path) for path in ordered_materials)
+            result = self.manager.create_moneyprinter(
                 subject=brief.product_name or brief.model,
                 script=script.text,
                 duration_seconds=brief.target_seconds,
@@ -374,13 +459,17 @@ class ProductAdWindow:
                 video_materials=materials,
                 transition_mode="fade-in",
                 concat_mode="sequential",
-                clip_duration=6,
+                clip_duration=8,
                 bgm_type=self.music_var.get(),
-                subtitle_enabled=False,
+                subtitle_enabled=True,
                 voice_rate=1.02,
             )
+            result["real_videos"] = len(real_videos)
+            result["research_sources"] = len(report.sources) if report else 0
+            result["verified_facts"] = len(verified_facts)
+            return result
 
-        self._background("يتم تجهيز الصور والصوت وإنشاء الإعلان", work)
+        self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
 
 
 def open_product_ad(parent, runtime, *, font_family: str, scale: float) -> ProductAdWindow:
