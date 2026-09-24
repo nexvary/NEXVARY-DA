@@ -29,10 +29,18 @@ $shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\NEXVAR
 if (-not (Test-Path $shortcut)) {
     throw "Start Menu shortcut missing: $shortcut"
 }
+$desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "NEXVARY Developer Agent.lnk"
+if (-not (Test-Path $desktopShortcut)) {
+    throw "Desktop shortcut missing: $desktopShortcut"
+}
 $ws = New-Object -ComObject WScript.Shell
 $targetPath = $ws.CreateShortcut($shortcut).TargetPath
 if ((Resolve-Path $targetPath).Path -ne (Resolve-Path $guiExe).Path) {
     throw "Start Menu shortcut points to wrong executable: $targetPath"
+}
+$desktopTargetPath = $ws.CreateShortcut($desktopShortcut).TargetPath
+if ((Resolve-Path $desktopTargetPath).Path -ne (Resolve-Path $guiExe).Path) {
+    throw "Desktop shortcut points to wrong executable: $desktopTargetPath"
 }
 
 $env:NEXVARY_DA_APPDATA = Join-Path $env:TEMP "nexvary-da-installed-gui-smoke"
@@ -62,6 +70,9 @@ while (((Test-Path $exe) -or (Test-Path $guiExe)) -and (Get-Date) -lt $deadline)
 }
 if ((Test-Path $exe) -or (Test-Path $guiExe)) {
     throw "executable still exists after uninstall"
+}
+if (Test-Path $desktopShortcut) {
+    throw "Desktop shortcut still exists after uninstall"
 }
 
 Write-Host "NSIS install/smoke/uninstall PASS"
