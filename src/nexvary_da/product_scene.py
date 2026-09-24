@@ -8,7 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from .instruction_image import InstructionScene, InstructionSceneKind
 from .permissions import Permission, WorkspaceGuard
