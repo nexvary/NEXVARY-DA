@@ -59,6 +59,7 @@ class ProductAdWindow:
         self.ai_enhanced_var = tk.BooleanVar(
             value=settings.get("ai_enhanced_product_ads", "true").lower() == "true"
         )
+        self.ai_brain_var = tk.StringVar(value=settings.get("ai_brain", "auto"))
         self.auto_ocr_product_images_var = tk.BooleanVar(
             value=settings.get("auto_ocr_product_images", "true").lower() == "true"
         )
@@ -384,6 +385,14 @@ class ProductAdWindow:
             font=(self.font, self.px(8), "bold"),
         ).pack(fill="x", pady=(self.px(3), self.px(3)))
 
+        self._choice(
+            controls,
+            "العقل المستخدم لفهم الصور والمشاهد",
+            self.ai_brain_var,
+            (("تلقائي", "auto"), ("CodeCraft", "codecraft"), ("محلي", "local")),
+            PALETTE.cyan,
+        )
+
         self.label(controls, "معاينة النص الذي سيُقال", size=8, fg=PALETTE.magenta, bold=True).pack(
             fill="x", pady=(self.px(10), self.px(3))
         )
@@ -558,8 +567,9 @@ class ProductAdWindow:
                         explainer = "نعم" if result.get("operation_explainer") else "لا"
                         instruction_scenes = int(result.get("instruction_scenes", 0))
                         ai_scenes = int(result.get("ai_scene_assets", 0))
+                        brain = "CodeCraft" if result.get("codecraft_used") else "Local"
                         self.status_var.set(
-                            f"تم إنشاء الإعلان بنجاح • مقاطع حقيقية: {real_videos} • "
+                            f"تم إنشاء الإعلان بنجاح • العقل: {brain} • مقاطع حقيقية: {real_videos} • "
                             f"مشاهد AI: {ai_scenes} • مشاهد من صور التعليمات: {instruction_scenes} • "
                             f"مصادر بحث: {sources} • حقائق موثقة: {facts} • "
                             f"خطوات تشغيل: {steps} • شرح متحرك: {explainer}"
@@ -588,6 +598,7 @@ class ProductAdWindow:
                     "product_ad_video_audio": self.video_audio_var.get(),
                     "ai_enhanced_product_ads": "true" if self.ai_enhanced_var.get() else "false",
                     "auto_ocr_product_images": "true" if self.auto_ocr_product_images_var.get() else "false",
+                    "ai_brain": self.ai_brain_var.get(),
                 }
             )
         except Exception as exc:
@@ -600,6 +611,7 @@ class ProductAdWindow:
         research_enabled = bool(self.research_var.get())
         ai_enhanced_enabled = bool(self.ai_enhanced_var.get())
         auto_ocr_product_images = bool(self.auto_ocr_product_images_var.get())
+        ai_brain = self.ai_brain_var.get()
         voice_name = self.voice_var.get()
         music_mode = self.music_var.get()
         video_role = self.video_role_var.get()
@@ -657,6 +669,37 @@ class ProductAdWindow:
                         if instruction_warning
                         else f"product-image OCR: {suffix}"
                     )
+
+            codecraft_plan = None
+            codecraft_warning = ""
+            if ai_enhanced_enabled and ai_brain in {"auto", "codecraft"}:
+                provider = self.runtime.codecraft()
+                if provider.has_api_key():
+                    try:
+                        settings = self.runtime.integration_settings().load()
+                        max_ai_scenes = max(1, min(8, int(settings.get("ai_max_scenes", "4") or "4")))
+                        vision_inputs = tuple(selected_instruction_images) + tuple(selected_images)
+                        codecraft_plan = provider.analyze_product_images(
+                            vision_inputs,
+                            product_name=brief.product_name,
+                            model_name=brief.model,
+                            seller_details=brief.details,
+                            preferred_model=settings.get("codecraft_model", ""),
+                            max_scenes=max_ai_scenes,
+                        )
+                        existing = {
+                            (scene.kind.value, scene.narration.strip().casefold())
+                            for scene in instruction_scenes
+                        }
+                        for scene in codecraft_plan.scenes:
+                            key = (scene.kind.value, scene.narration.strip().casefold())
+                            if key not in existing:
+                                instruction_scenes.append(scene)
+                                existing.add(key)
+                    except Exception as exc:
+                        codecraft_warning = f"{type(exc).__name__}: {exc}"
+                elif ai_brain == "codecraft":
+                    codecraft_warning = "CodeCraft API key is not configured"
 
             ai_scene_assets = ()
             ai_scene_warning = ""
@@ -750,6 +793,10 @@ class ProductAdWindow:
             result["ai_scene_assets"] = len(ai_scene_assets)
             result["ai_scene_materials"] = len(ai_scene_materials)
             result["ai_scene_warning"] = ai_scene_warning
+            result["codecraft_used"] = codecraft_plan is not None
+            result["codecraft_model"] = codecraft_plan.model_id if codecraft_plan else ""
+            result["codecraft_scenes"] = len(codecraft_plan.scenes) if codecraft_plan else 0
+            result["codecraft_warning"] = codecraft_warning
             return result
 
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
