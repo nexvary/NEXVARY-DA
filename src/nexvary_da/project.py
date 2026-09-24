@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .agents import AgentPool
+from .ai_scene import ComfyUISceneGenerator
 from .ai_video import AIVideoRouter
 from .checkpoint import CheckpointStore
 from .android_profile import AndroidTools
@@ -193,6 +194,14 @@ class ProjectRuntime:
         return AIVideoRouter(
             self.guard,
             self.runner,
+            self.state,
+            self.root,
+            self.integration_settings(),
+        )
+
+    def ai_scene_generator(self) -> ComfyUISceneGenerator:
+        return ComfyUISceneGenerator(
+            self.guard,
             self.state,
             self.root,
             self.integration_settings(),
