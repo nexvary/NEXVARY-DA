@@ -73,6 +73,16 @@ def main(argv: list[str] | None = None) -> int:
         workspace = ensure_default_workspace()
         if "--smoke" in args:
             return 0
+        if "--ui-smoke" in args:
+            import tkinter as tk
+            from nexvary_da.ui_app import DeveloperAgentUI
+
+            window = tk.Tk()
+            app = DeveloperAgentUI(window, workspace)
+            window.protocol("WM_DELETE_WINDOW", app.close)
+            window.after(1200, app.close)
+            window.mainloop()
+            return 0
         launch_ui(workspace)
         return 0
     except Exception as exc:
