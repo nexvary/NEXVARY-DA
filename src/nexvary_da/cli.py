@@ -123,6 +123,9 @@ def build_parser() -> argparse.ArgumentParser:
     integrations = sub.add_parser("integrations", help="Show optional automation/media integration readiness")
     integrations.add_argument("path", nargs="?", default=".")
 
+    ai_hw = sub.add_parser("ai-hardware", help="Inspect hardware and AI-video engine suitability")
+    ai_hw.add_argument("path", nargs="?", default=".")
+
     fastmcp = sub.add_parser("fastmcp-run", help="Start an approved FastMCP server")
     fastmcp.add_argument("target")
     fastmcp.add_argument("--path", default=".")
@@ -289,6 +292,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "integrations":
             payload = runtime.plugins().snapshot()
             payload["custom_manifests"] = runtime.plugins().load_custom_manifests()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "ai-hardware":
+            router = runtime.ai_video()
+            payload = {
+                "hardware": router.hardware().to_dict(),
+                "engines": [item.to_dict() for item in router.assessments()],
+                "selected": router.choose_engine(
+                    runtime.integration_settings().get("ai_video_mode", default="hybrid")
+                ).to_dict(),
+            }
             print(json.dumps(payload, indent=2, ensure_ascii=False))
             return 0
 
