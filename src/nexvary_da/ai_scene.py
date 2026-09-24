@@ -146,14 +146,94 @@ class ComfyUISceneGenerator:
             path = self.root / path
         return path if path.is_file() else None
 
+    def _json_get(self, path: str, *, timeout: float = 5.0) -> dict[str, Any]:
+        with urlrequest.urlopen(self._base_url() + path, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+        return payload if isinstance(payload, dict) else {}
+
+    def _discover_checkpoint(self) -> str:
+        try:
+            payload = self._json_get("/object_info/CheckpointLoaderSimple")
+            node = payload.get("CheckpointLoaderSimple")
+            required = ((node or {}).get("input") or {}).get("required") or {}
+            spec = required.get("ckpt_name")
+            choices = spec[0] if isinstance(spec, list) and spec else []
+            if isinstance(choices, list):
+                names = [str(item) for item in choices if str(item).strip()]
+                preferred = [name for name in names if name.lower().endswith((".safetensors", ".ckpt"))]
+                if preferred:
+                    return preferred[0]
+                if names:
+                    return names[0]
+        except Exception:
+            pass
+        return ""
+
+    @staticmethod
+    def _default_image_workflow(checkpoint: str) -> dict[str, Any]:
+        return {
+            "1": {
+                "class_type": "CheckpointLoaderSimple",
+                "inputs": {"ckpt_name": checkpoint},
+            },
+            "2": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": "${PROMPT}", "clip": ["1", 1]},
+                "_meta": {"title": "Positive Prompt"},
+            },
+            "3": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {"text": "${NEGATIVE_PROMPT}", "clip": ["1", 1]},
+                "_meta": {"title": "Negative Prompt"},
+            },
+            "4": {
+                "class_type": "EmptyLatentImage",
+                "inputs": {"width": 720, "height": 1280, "batch_size": 1},
+            },
+            "5": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": 771245991,
+                    "steps": 22,
+                    "cfg": 6.5,
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "denoise": 1.0,
+                    "model": ["1", 0],
+                    "positive": ["2", 0],
+                    "negative": ["3", 0],
+                    "latent_image": ["4", 0],
+                },
+            },
+            "6": {
+                "class_type": "VAEDecode",
+                "inputs": {"samples": ["5", 0], "vae": ["1", 2]},
+            },
+            "7": {
+                "class_type": "SaveImage",
+                "inputs": {"filename_prefix": "${OUTPUT_PREFIX}", "images": ["6", 0]},
+            },
+        }
+
     def ready(self) -> dict[str, Any]:
         workflow = self._workflow_path()
-        if workflow is None:
-            return {"ready": False, "reason": "No ComfyUI API workflow configured."}
         try:
-            with urlrequest.urlopen(self._base_url() + "/system_stats", timeout=2.5) as response:
-                json.loads(response.read().decode("utf-8", errors="replace"))
-            return {"ready": True, "workflow": str(workflow), "url": self._base_url()}
+            self._json_get("/system_stats", timeout=2.5)
+            if workflow is not None:
+                return {"ready": True, "workflow": str(workflow), "url": self._base_url(), "mode": "custom"}
+            checkpoint = self._discover_checkpoint()
+            if checkpoint:
+                return {
+                    "ready": True,
+                    "workflow": "auto-basic-image",
+                    "checkpoint": checkpoint,
+                    "url": self._base_url(),
+                    "mode": "auto",
+                }
+            return {
+                "ready": False,
+                "reason": "ComfyUI is running but no API workflow or checkpoint was detected.",
+            }
         except Exception as exc:
             return {"ready": False, "reason": f"{type(exc).__name__}: {exc}"}
 
@@ -253,12 +333,18 @@ class ComfyUISceneGenerator:
             return ()
 
         workflow_path = self._workflow_path()
-        if workflow_path is None:
-            return ()
-        try:
-            raw_workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Invalid ComfyUI API workflow: {workflow_path}") from exc
+        workflow_label = "auto-basic-image"
+        if workflow_path is not None:
+            try:
+                raw_workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError(f"Invalid ComfyUI API workflow: {workflow_path}") from exc
+            workflow_label = str(workflow_path)
+        else:
+            checkpoint = str(status.get("checkpoint") or self._discover_checkpoint())
+            if not checkpoint:
+                return ()
+            raw_workflow = self._default_image_workflow(checkpoint)
         if not isinstance(raw_workflow, dict) or not raw_workflow:
             raise ValueError("ComfyUI API workflow must be a non-empty JSON object")
 
@@ -304,7 +390,7 @@ class ComfyUISceneGenerator:
             "product_ad.ai_scenes.generated",
             {
                 "scene_count": len(assets),
-                "workflow": str(workflow_path),
+                "workflow": workflow_label,
                 "reference_image": bool(uploaded_image),
                 "outputs": [item.to_dict() for item in assets],
             },
