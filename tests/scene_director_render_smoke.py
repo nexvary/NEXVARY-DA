@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from nexvary_da.instruction_image import plan_instruction_scenes
 from nexvary_da.permissions import Permission
 from nexvary_da.product_ad import ProductAdBrief
 from nexvary_da.product_scene import (
@@ -83,8 +84,20 @@ def main() -> int:
             if explainer is None or not explainer.is_file() or explainer.stat().st_size <= 0:
                 raise SystemExit("Scene Director operation explainer was not rendered")
 
+            instruction_scenes = plan_instruction_scenes(
+                "الشحن عن طريق البريد\nمندوب البريد يستلم المال نقدا عند التسليم"
+            )
+            storyboard = director.render_instruction_storyboard(
+                brief,
+                instruction_scenes,
+                seconds_per_scene=1.0,
+            )
+            if storyboard is None or not storyboard.is_file() or storyboard.stat().st_size <= 0:
+                raise SystemExit("Scene Director instruction storyboard was not rendered")
+
             print(f"clips={len(clips)}")
             print(f"explainer={explainer}")
+            print(f"instruction_storyboard={storyboard}")
             return 0
         finally:
             runtime.close()
