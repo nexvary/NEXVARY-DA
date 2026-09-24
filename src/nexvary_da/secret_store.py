@@ -24,11 +24,38 @@ def _blob_from_bytes(data: bytes) -> tuple[_DATA_BLOB, ctypes.Array]:
     return blob, buffer
 
 
-def _dpapi_protect(data: bytes) -> bytes:
+def _win_crypto():
     if os.name != "nt":
         raise RuntimeError("Windows DPAPI is only available on Windows")
-    crypt32 = ctypes.windll.crypt32
-    kernel32 = ctypes.windll.kernel32
+    crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    crypt32.CryptProtectData.argtypes = [
+        ctypes.POINTER(_DATA_BLOB),
+        wintypes.LPCWSTR,
+        ctypes.POINTER(_DATA_BLOB),
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(_DATA_BLOB),
+    ]
+    crypt32.CryptProtectData.restype = wintypes.BOOL
+    crypt32.CryptUnprotectData.argtypes = [
+        ctypes.POINTER(_DATA_BLOB),
+        ctypes.POINTER(wintypes.LPWSTR),
+        ctypes.POINTER(_DATA_BLOB),
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(_DATA_BLOB),
+    ]
+    crypt32.CryptUnprotectData.restype = wintypes.BOOL
+    kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel32.LocalFree.restype = ctypes.c_void_p
+    return crypt32, kernel32
+
+
+def _dpapi_protect(data: bytes) -> bytes:
+    crypt32, kernel32 = _win_crypto()
     source, _buffer = _blob_from_bytes(data)
     output = _DATA_BLOB()
     flags = 0x01  # CRYPTPROTECT_UI_FORBIDDEN
@@ -50,10 +77,7 @@ def _dpapi_protect(data: bytes) -> bytes:
 
 
 def _dpapi_unprotect(data: bytes) -> bytes:
-    if os.name != "nt":
-        raise RuntimeError("Windows DPAPI is only available on Windows")
-    crypt32 = ctypes.windll.crypt32
-    kernel32 = ctypes.windll.kernel32
+    crypt32, kernel32 = _win_crypto()
     source, _buffer = _blob_from_bytes(data)
     output = _DATA_BLOB()
     flags = 0x01
@@ -155,4 +179,18 @@ class SecretStore:
             return
         payload.pop(name, None)
         target = self.guard.require(self.path, Permission.WRITE, must_exist=True)
-        target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        fd, temp_name = tempfile.mkstemp(prefix=".secrets.", suffix=".json", dir=target.parent)
+        try:
+            try:
+                os.chmod(temp_name, 0o600)
+            except OSError:
+                pass
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+                json.dump(payload, handle, indent=2, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_name, target)
+        finally:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
