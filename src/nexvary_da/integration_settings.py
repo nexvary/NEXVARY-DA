@@ -32,6 +32,7 @@ _ALLOWED_DEFAULTS: dict[str, str] = {
     "comfyui_url": "http://127.0.0.1:8188",
     "comfyui_workflow_path": "",
     "ai_enhanced_product_ads": "true",
+    "auto_ocr_product_images": "true",
     "ai_max_scenes": "4",
     "cogvideox_root": "",
     "framepack_root": "",
