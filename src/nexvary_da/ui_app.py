@@ -11,6 +11,7 @@ from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime
 from .ui_easy_mode import EasyModePanel
+from .ui_ai_video import open_ai_video_manager
 from .ui_info import open_about_window, open_system_overview_window
 from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
@@ -154,6 +155,7 @@ class DeveloperAgentUI:
         for label, page, accent in (
             ("HOME", "home", True),
             ("PRODUCT AD", "product_ad", True),
+            ("AI MODELS", "ai_models", False),
             ("VIDEO", "video", False),
             ("TOOLS", "toolbox", False),
             ("SETUP", "integrations", False),
@@ -231,6 +233,12 @@ class DeveloperAgentUI:
         }
         if target == "product_ad":
             return open_product_ad(
+                self._embedded_page,
+                self.runtime,
+                **common,
+            )
+        if target == "ai_models":
+            return open_ai_video_manager(
                 self._embedded_page,
                 self.runtime,
                 **common,
