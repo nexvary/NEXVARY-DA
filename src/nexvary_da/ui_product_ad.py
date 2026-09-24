@@ -47,9 +47,12 @@ class ProductAdWindow:
         self.status_var = tk.StringVar(value="أدخل بيانات المنتج وأضف الصور والفيديو الحقيقي ثم اضغط معاينة النص.")
         self.images_var = tk.StringVar(value="لم يتم اختيار صور")
         self.videos_var = tk.StringVar(value="لم يتم اختيار فيديو حقيقي")
+        self.instruction_images_var = tk.StringVar(value="لم يتم اختيار صور شرح أو تعليمات")
         self.research_var = tk.BooleanVar(value=True)
         self.selected_images: list[str] = []
         self.selected_videos: list[str] = []
+        self.selected_instruction_images: list[str] = []
+        self.instruction_analyses = ()
         self.details_box = None
         self.script_preview = None
         self._build()
@@ -247,6 +250,29 @@ class ProductAdWindow:
             side="left", padx=self.px(5), pady=self.px(5)
         )
 
+        instructions = tk.Frame(content, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
+        instructions.pack(fill="x", pady=(self.px(7), 0))
+        self.label(instructions, "صور شرح / تعليمات شراء أو استخدام", size=8, fg=PALETTE.gold, bold=True).pack(
+            side="right", padx=self.px(8), pady=self.px(8)
+        )
+        tk.Label(
+            instructions,
+            textvariable=self.instruction_images_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.muted,
+            anchor="e",
+            font=(self.font, self.px(7)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
+        self.button(instructions, "إضافة صور شرح", self.choose_instruction_images, accent=True).pack(
+            side="left", padx=self.px(4), pady=self.px(5)
+        )
+        self.button(instructions, "تحليل", self.analyze_instruction_images).pack(
+            side="left", padx=self.px(4), pady=self.px(5)
+        )
+        self.button(instructions, "مسح", self.clear_instruction_images).pack(
+            side="left", padx=self.px(4), pady=self.px(5)
+        )
+
         controls = tk.Frame(right, bg=PALETTE.surface)
         controls.pack(fill="both", expand=True, padx=self.px(12), pady=self.px(12))
         self._choice(
@@ -381,6 +407,53 @@ class ProductAdWindow:
         self.selected_videos = []
         self.videos_var.set("لم يتم اختيار فيديو حقيقي")
 
+    def choose_instruction_images(self):
+        files = self.filedialog.askopenfilenames(
+            parent=self.window,
+            title="اختر صور الشرح أو تعليمات الشراء / الاستخدام",
+            filetypes=[
+                ("Instruction images", "*.jpg *.jpeg *.png *.webp *.bmp"),
+                ("All files", "*.*"),
+            ],
+        )
+        if files:
+            self.selected_instruction_images = list(files)
+            self.instruction_analyses = ()
+            self.instruction_images_var.set(f"{len(self.selected_instruction_images)} صورة شرح مختارة")
+
+    def clear_instruction_images(self):
+        self.selected_instruction_images = []
+        self.instruction_analyses = ()
+        self.instruction_images_var.set("لم يتم اختيار صور شرح أو تعليمات")
+
+    def analyze_instruction_images(self):
+        if not self.selected_instruction_images:
+            self.status_var.set("أضف صورة شرح أو تعليمات أولًا.")
+            return
+        selected = tuple(self.selected_instruction_images)
+        self.status_var.set("يتم استخراج النص وفهم الخطوات وتحويلها إلى مشاهد…")
+
+        def worker():
+            try:
+                analyses = self.runtime.instruction_images().analyze(selected)
+                scene_count = sum(len(item.scenes) for item in analyses)
+
+                def done():
+                    self.instruction_analyses = analyses
+                    self.status_var.set(
+                        f"تم تحليل {len(analyses)} صورة • تم اكتشاف {scene_count} مشهد/خطوة قابلة للتحويل إلى فيديو."
+                    )
+                self.window.after(0, done)
+            except Exception as exc:
+                self.window.after(
+                    0,
+                    lambda: self.status_var.set(
+                        f"تعذر تحليل صور التعليمات: {type(exc).__name__}: {exc}"
+                    ),
+                )
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _brief(self) -> ProductAdBrief:
         details = self.details_box.get("1.0", "end").strip() if self.details_box is not None else ""
         return ProductAdBrief(
@@ -395,10 +468,16 @@ class ProductAdWindow:
 
     def preview_script(self):
         try:
+            seller_instructions = tuple(
+                scene.narration
+                for analysis in self.instruction_analyses
+                for scene in analysis.scenes
+            )
             script = build_arabic_product_script(
                 self._brief(),
                 real_video_count=len(self.selected_videos),
                 real_video_role=self.video_role_var.get(),
+                seller_instructions=seller_instructions,
             )
             if self.script_preview is not None:
                 self.script_preview.configure(state="normal")
@@ -424,8 +503,10 @@ class ProductAdWindow:
                         real_videos = int(result.get("real_videos", 0))
                         steps = int(result.get("verified_setup_steps", 0))
                         explainer = "نعم" if result.get("operation_explainer") else "لا"
+                        instruction_scenes = int(result.get("instruction_scenes", 0))
                         self.status_var.set(
                             f"تم إنشاء الإعلان بنجاح • مقاطع حقيقية: {real_videos} • "
+                            f"مشاهد من صور التعليمات: {instruction_scenes} • "
                             f"مصادر بحث: {sources} • حقائق موثقة: {facts} • "
                             f"خطوات تشغيل: {steps} • شرح متحرك: {explainer}"
                         )
@@ -459,6 +540,7 @@ class ProductAdWindow:
 
         selected_images = tuple(self.selected_images)
         selected_videos = tuple(self.selected_videos)
+        selected_instruction_images = tuple(self.selected_instruction_images)
         research_enabled = bool(self.research_var.get())
         voice_name = self.voice_var.get()
         music_mode = self.music_var.get()
@@ -480,6 +562,27 @@ class ProductAdWindow:
                 role=video_role,
                 audio_policy=video_audio,
                 clip_seconds=8.0,
+            )
+
+            instruction_analyses = ()
+            instruction_scenes = []
+            instruction_warning = ""
+            if selected_instruction_images:
+                try:
+                    instruction_analyses = self.runtime.instruction_images().analyze(
+                        selected_instruction_images
+                    )
+                    instruction_scenes = [
+                        scene
+                        for analysis in instruction_analyses
+                        for scene in analysis.scenes
+                    ]
+                except Exception as exc:
+                    instruction_warning = f"{type(exc).__name__}: {exc}"
+
+            instruction_storyboard = director.render_instruction_storyboard(
+                brief,
+                instruction_scenes,
             )
 
             report = None
@@ -504,9 +607,12 @@ class ProductAdWindow:
                 real_video_role=video_role,
                 verified_facts=verified_facts,
                 setup_steps=verified_steps,
+                seller_instructions=tuple(scene.narration for scene in instruction_scenes),
             )
 
             ordered_materials = [*frames, *prepared_real_videos]
+            if instruction_storyboard is not None:
+                ordered_materials.append(instruction_storyboard)
             if operation_explainer is not None:
                 ordered_materials.append(operation_explainer)
             ordered_materials.extend(research_cards)
@@ -533,6 +639,10 @@ class ProductAdWindow:
             result["verified_facts"] = len(verified_facts)
             result["verified_setup_steps"] = len(verified_steps)
             result["operation_explainer"] = operation_explainer is not None
+            result["instruction_images"] = len(instruction_analyses)
+            result["instruction_scenes"] = len(instruction_scenes)
+            result["instruction_storyboard"] = instruction_storyboard is not None
+            result["instruction_warning"] = instruction_warning
             return result
 
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
