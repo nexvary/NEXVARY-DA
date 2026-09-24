@@ -67,9 +67,12 @@ def _show_error(message: str) -> None:
         print(message, file=sys.stderr)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
     try:
         workspace = ensure_default_workspace()
+        if "--smoke" in args:
+            return 0
         launch_ui(workspace)
         return 0
     except Exception as exc:
