@@ -36,6 +36,9 @@ class AIVideoManagerPanel:
         self.mode_var = tk.StringVar(value=settings.get("ai_video_mode", AIVideoMode.HYBRID.value))
         self.model_root_var = tk.StringVar(value=settings.get("ai_model_root", ""))
         self.comfy_url_var = tk.StringVar(value=settings.get("comfyui_url", "http://127.0.0.1:8188"))
+        self.workflow_var = tk.StringVar(value=settings.get("comfyui_workflow_path", ""))
+        self.ai_enabled_var = tk.BooleanVar(value=settings.get("ai_enhanced_product_ads", "true").lower() == "true")
+        self.max_scenes_var = tk.StringVar(value=settings.get("ai_max_scenes", "4"))
         self.path_vars = {
             "cogvideox_root": tk.StringVar(value=settings.get("cogvideox_root", "")),
             "framepack_root": tk.StringVar(value=settings.get("framepack_root", "")),
@@ -144,6 +147,37 @@ class AIVideoManagerPanel:
 
         self._path_row(config, "MODEL STORAGE", self.model_root_var, directory=True)
         self._text_row(config, "COMFYUI API", self.comfy_url_var)
+        self._file_row(config, "COMFYUI API WORKFLOW (.json)", self.workflow_var)
+        options = tk.Frame(config, bg=PALETTE.surface)
+        options.pack(fill="x", padx=self.px(12), pady=(self.px(6), self.px(3)))
+        tk.Checkbutton(
+            options,
+            text="AI Enhanced داخل Product Ad",
+            variable=self.ai_enabled_var,
+            onvalue=True,
+            offvalue=False,
+            bg=PALETTE.surface,
+            fg=PALETTE.action,
+            selectcolor=PALETTE.surface_alt,
+            activebackground=PALETTE.surface,
+            activeforeground=PALETTE.action,
+            font=(self.font, self.px(8), "bold"),
+        ).pack(side="left")
+        self.label(options, "MAX AI SCENES", size=7, fg=PALETTE.muted, bold=True).pack(
+            side="left", padx=(self.px(18), self.px(6))
+        )
+        tk.Spinbox(
+            options,
+            from_=1,
+            to=8,
+            textvariable=self.max_scenes_var,
+            width=4,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.text,
+            buttonbackground=PALETTE.surface_alt,
+            relief="flat",
+            font=(self.font, self.px(8)),
+        ).pack(side="left")
         self._path_row(config, "COGVIDEOX ROOT", self.path_vars["cogvideox_root"], directory=True)
         self._path_row(config, "FRAMEPACK ROOT", self.path_vars["framepack_root"], directory=True)
         self._path_row(config, "LTX ROOT", self.path_vars["ltx_root"], directory=True)
@@ -183,6 +217,33 @@ class AIVideoManagerPanel:
             highlightbackground=PALETTE.silver,
             font=(self.font, self.px(8)),
         ).pack(side="left", fill="x", expand=True, ipady=self.px(4))
+
+    def _file_row(self, parent, title: str, variable):
+        row = self.tk.Frame(parent, bg=PALETTE.surface)
+        row.pack(fill="x", padx=self.px(12), pady=self.px(3))
+        self.label(row, title, size=7, fg=PALETTE.muted, bold=True).pack(side="left", padx=(0, self.px(8)))
+        self.tk.Entry(
+            row,
+            textvariable=variable,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.text,
+            insertbackground=PALETTE.action,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            font=(self.font, self.px(8)),
+        ).pack(side="left", fill="x", expand=True, ipady=self.px(4))
+        self.button(row, "BROWSE", lambda: self._browse_file(variable)).pack(side="right", padx=(self.px(6), 0))
+
+    def _browse_file(self, variable):
+        value = self.filedialog.askopenfilename(
+            parent=self.window,
+            title="Choose ComfyUI API workflow",
+            filetypes=[("ComfyUI API workflow", "*.json"), ("All files", "*.*")],
+        )
+        if value:
+            variable.set(value)
 
     def _path_row(self, parent, title: str, variable, *, directory=False):
         row = self.tk.Frame(parent, bg=PALETTE.surface)
@@ -280,6 +341,9 @@ class AIVideoManagerPanel:
                     "ai_video_mode": self.mode_var.get(),
                     "ai_model_root": self.model_root_var.get(),
                     "comfyui_url": self.comfy_url_var.get(),
+                    "comfyui_workflow_path": self.workflow_var.get(),
+                    "ai_enhanced_product_ads": "true" if self.ai_enabled_var.get() else "false",
+                    "ai_max_scenes": self.max_scenes_var.get(),
                     "cogvideox_root": self.path_vars["cogvideox_root"].get(),
                     "framepack_root": self.path_vars["framepack_root"].get(),
                     "ltx_root": self.path_vars["ltx_root"].get(),
