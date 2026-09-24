@@ -73,7 +73,7 @@ def scale_for_screen(width: int, height: int) -> float:
         return 1.18
     if width >= 1800 or height >= 1050:
         return 1.08
-    if width <= 1100 or height <= 700:
+    if width <= 1366 or height <= 850:
         return 0.92
     return 1.0
 
