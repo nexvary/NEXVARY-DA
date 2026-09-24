@@ -67,6 +67,7 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
     from .ui_integration_center import IntegrationCenter
     from .ui_project_dialog import open_add_project_dialog
     from .ui_toolbox import ToolBox
+    from .ui_video_studio import VideoStudioWindow
 
     runtime = ProjectRuntime(project_root)
     try:
@@ -83,6 +84,7 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
         "open_system_overview",
         "open_integrations",
         "open_toolbox",
+        "open_video_studio",
     }
     try:
         app = DeveloperAgentUI(root, project_root)
@@ -120,6 +122,15 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
             toolbox._render(name)
             routes.append(_inspect(f"toolbox.{name.lower()}", toolbox.window))
         toolbox.window.destroy()
+
+        video_studio = VideoStudioWindow(
+            root,
+            app.runtime,
+            font_family=app.font,
+            scale=app.scale,
+        )
+        routes.append(_inspect("video.studio", video_studio.window))
+        video_studio.window.destroy()
 
         dialog = open_add_project_dialog(
             root,

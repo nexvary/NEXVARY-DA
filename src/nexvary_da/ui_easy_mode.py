@@ -127,11 +127,12 @@ class EasyModePanel:
             ),
             self._action_card(
                 grid,
-                "Automation & media",
-                "Use browser, desktop, image, video, voice and MCP through simple forms.",
-                "OPEN TOOL BOX",
-                self.app.open_toolbox,
+                "Video Studio",
+                "Create 60-second Shorts/Reels with MoneyPrinterTurbo or a free local engine.",
+                "CREATE A VIDEO",
+                self.app.open_video_studio,
                 color=PALETTE.magenta,
+                accent=True,
             ),
             self._action_card(
                 grid,

@@ -173,7 +173,15 @@ class VideoStudioManager:
             if shutil.which("magick") is None and shutil.which("convert") is None:
                 missing.append("ImageMagick")
 
-        ready = installed and not any(item in missing for item in ("Git", "Node.js 18+", "npm", "Node.js/npm"))
+        runtime_blockers = {
+            VideoEngineId.MONEYPRINTER: {"uv or prepared Python venv"},
+            VideoEngineId.AUTOMATED_VIDEO: {"Node.js 18+", "npm"},
+            VideoEngineId.SHORTS_GENERATOR: {"Node.js/npm", "ImageMagick", "prepared Python venv"},
+        }[spec.engine]
+        if spec.engine is VideoEngineId.SHORTS_GENERATOR and installed and root is not None:
+            if not self._venv_python(root).is_file():
+                missing.append("prepared Python venv")
+        ready = installed and not any(item in runtime_blockers for item in missing)
         return VideoEngineStatus(
             spec.engine.value,
             spec.name,
@@ -327,6 +335,7 @@ class VideoStudioManager:
         language: str = "ar",
         video_source: str = "pexels",
         voice_name: str = "",
+        video_materials: str = "",
         timeout: float = 3600,
     ) -> dict[str, Any]:
         spec = self.spec(VideoEngineId.MONEYPRINTER)
@@ -362,6 +371,12 @@ class VideoStudioManager:
                 ]
             )
         args.extend(["--video-aspect", aspect, "--video-language", language, "--video-source", video_source])
+        if video_source == "local":
+            if not video_materials.strip():
+                raise ValueError("Choose one or more local video/image files for local source mode")
+            args.extend(["--video-materials", video_materials.strip()])
+        elif video_materials.strip():
+            raise ValueError("Local materials can only be used with local source mode")
         if voice_name.strip():
             args.extend(["--voice-name", voice_name.strip()])
 
@@ -375,6 +390,7 @@ class VideoStudioManager:
                 "aspect": aspect,
                 "language": language,
                 "source": video_source,
+                "local_material_count": len([x for x in video_materials.split(",") if x.strip()]),
                 "subject_chars": len(subject),
                 "script_chars": len(script),
             },

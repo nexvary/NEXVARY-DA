@@ -15,6 +15,7 @@ from .ui_info import open_about_window, open_system_overview_window
 from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
 from .ui_toolbox import open_toolbox
+from .ui_video_studio import open_video_studio
 from .ui_terminal import TerminalPanel
 from .ui_theme import PALETTE, scale_for_screen, section_color, status_color
 
@@ -184,6 +185,14 @@ class DeveloperAgentUI:
 
     def open_toolbox(self) -> None:
         open_toolbox(
+            self.window,
+            self.runtime,
+            font_family=self.font,
+            scale=self.scale,
+        )
+
+    def open_video_studio(self):
+        return open_video_studio(
             self.window,
             self.runtime,
             font_family=self.font,
