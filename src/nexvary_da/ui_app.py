@@ -29,6 +29,8 @@ class DeveloperAgentUI:
             self.runtime.close()
             raise PermissionError("Desktop UI terminal requires explicit shell permission")
         self.tracker = ProjectChangeTracker(self.runtime.root)
+        self._closing = False
+        self._poll_inflight = False
         self.terminal = self.runtime.terminal_for("ui")
         self.scale = scale_for_screen(window.winfo_screenwidth(), window.winfo_screenheight())
         self.font = "Segoe UI" if window.tk.call("tk", "windowingsystem") == "win32" else "TkDefaultFont"
@@ -46,11 +48,25 @@ class DeveloperAgentUI:
 
     def _setup_window(self) -> None:
         w, h = self.window.winfo_screenwidth(), self.window.winfo_screenheight()
-        width, height = min(max(1180, int(w * .88)), 1720), min(max(760, int(h * .86)), 1040)
+        usable_w = max(900, w - 80)
+        usable_h = max(620, h - 100)
+        min_width = min(1024, usable_w)
+        min_height = min(700, usable_h)
+        width = min(max(min_width, int(w * .88)), min(1720, usable_w))
+        height = min(max(min_height, int(h * .82)), min(1040, usable_h))
         saved = self.runtime.state.get_meta("ui.geometry")
+        geometry = f"{width}x{height}"
+        if isinstance(saved, str):
+            try:
+                size = saved.split("+", 1)[0]
+                saved_w, saved_h = (int(value) for value in size.split("x", 1))
+                if min_width <= saved_w <= usable_w and min_height <= saved_h <= usable_h:
+                    geometry = saved
+            except (TypeError, ValueError):
+                pass
         self.window.title(f"NEXVARY Developer Agent — {self.runtime.config.name}")
-        self.window.geometry(saved if isinstance(saved, str) else f"{width}x{height}")
-        self.window.minsize(1024, 700)
+        self.window.geometry(geometry)
+        self.window.minsize(min_width, min_height)
         self.window.configure(bg=PALETTE.background)
 
     def label(self, parent, text: str, *, size=9, fg=None, bold=False, bg=None):
@@ -447,15 +463,49 @@ class DeveloperAgentUI:
         return open_add_project_dialog(self.window,runtime=self.runtime,font_family=self.font,scale=self.scale,append=self.append,on_imported=imported)
 
     def _poll_changes(self)->None:
-        try:
-            delta=self.tracker.poll(); changed=list(delta.changed) if delta.changed else self.runtime.git.changed_files(); n=len(changed)
-            self.summary["changes"].set(str(n)); self.set_status("files","FILES CLEAN" if not n else f"FILES {n}","PASS" if not n else "RUNNING")
-            if hasattr(self, "easy_panel"):
-                self.easy_panel.project_var.set("Ready" if not n else f"{n} changed file(s)")
-            if delta.changed: self.runtime.state.record_event("workspace.files.changed",{"count":n,"paths":changed[:100]})
-        except Exception:
-            pass
-        self.window.after(3000,self._poll_changes)
+        if self._closing or self._poll_inflight:
+            return
+        self._poll_inflight = True
+
+        def worker():
+            changed: list[str] = []
+            delta_changed: list[str] = []
+            try:
+                delta = self.tracker.poll()
+                delta_changed = list(delta.changed)
+                changed = delta_changed
+                if not changed and self.runtime.git.is_repository():
+                    changed = self.runtime.git.changed_files()
+                if delta_changed:
+                    self.runtime.state.record_event(
+                        "workspace.files.changed",
+                        {"count": len(changed), "paths": changed[:100]},
+                    )
+            except Exception:
+                changed = []
+
+            def apply():
+                self._poll_inflight = False
+                if self._closing:
+                    return
+                n = len(changed)
+                self.summary["changes"].set(str(n))
+                self.set_status(
+                    "files",
+                    "FILES CLEAN" if not n else f"FILES {n}",
+                    "PASS" if not n else "RUNNING",
+                )
+                if hasattr(self, "easy_panel"):
+                    self.easy_panel.project_var.set("Ready" if not n else f"{n} changed file(s)")
+                self.window.after(3000, self._poll_changes)
+
+            if not self._closing:
+                try:
+                    self.window.after(0, apply)
+                except Exception:
+                    self._poll_inflight = False
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _restore(self)->None:
         self.append(f"NEXVARY-DA • {self.runtime.config.name}"); self.append(f"SOURCE • {self.repo} • {self.branch} • {self.commit}"); self.append("SHORTCUTS • F5/Ctrl+Enter verify • Ctrl+L terminal • Ctrl+K clear")
@@ -463,6 +513,9 @@ class DeveloperAgentUI:
         if isinstance(last,dict) and last.get("complete"): self.set_status("ready","READY YES","READY")
 
     def close(self)->None:
+        if self._closing:
+            return
+        self._closing = True
         self.runtime.state.set_meta("ui.geometry",self.window.geometry())
         self.runtime.state.set_meta("ui.mode",self.mode.get())
         self.runtime.state.set_meta("ui.engine",self.engine.get())
