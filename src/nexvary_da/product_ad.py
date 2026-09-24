@@ -99,7 +99,9 @@ def build_arabic_product_script(
     brief: ProductAdBrief,
     *,
     real_video_count: int = 0,
+    real_video_role: str = "other",
     verified_facts: tuple[str, ...] | list[str] = (),
+    setup_steps: tuple[str, ...] | list[str] = (),
 ) -> ProductAdScript:
     """Build Arabic narration from seller facts, real evidence, and source-verified facts only."""
     brief = brief.normalized()
@@ -124,10 +126,26 @@ def build_arabic_product_script(
             parts.extend(detail_lines)
 
     if int(real_video_count) > 0:
-        parts.append(
-            "والآن شاهد تسجيلًا حقيقيًا من المنتج نفسه. "
-            "ركز في الصورة والتفاصيل واحكم على الأداء بنفسك."
-        )
+        real_video_intro = {
+            "camera_sample": (
+                "والآن هذا تصوير حقيقي من الكاميرا نفسها. "
+                "لاحظ وضوح الصورة والتفاصيل واحكم على الجودة بنفسك."
+            ),
+            "product_operation": (
+                "والآن شاهد تشغيلًا حقيقيًا للمنتج نفسه، "
+                "حتى ترى الأداء الفعلي بعيدًا عن الصور الدعائية."
+            ),
+            "installation_test": (
+                "وهذه تجربة تركيب وتشغيل فعلية للمنتج، "
+                "حتى ترى الخطوات والنتيجة الحقيقية."
+            ),
+            "other": (
+                "والآن شاهد فيديو حقيقيًا للمنتج نفسه "
+                "حتى ترى شكله وأداءه بصورة فعلية."
+            ),
+        }.get(str(real_video_role), "")
+        if real_video_intro:
+            parts.append(real_video_intro)
 
     safe_verified = [
         _clean_sentence(str(item))
@@ -137,6 +155,15 @@ def build_arabic_product_script(
     if safe_verified:
         parts.append("وبالنسبة للمواصفات التي تم التحقق منها من المصادر المتاحة:")
         parts.extend(safe_verified[:6])
+
+    safe_steps = [
+        _clean_sentence(str(item))
+        for item in setup_steps
+        if str(item).strip()
+    ]
+    if safe_steps:
+        parts.append("وطريقة التشغيل التالية مأخوذة من مصادر تم التحقق منها لهذا الموديل:")
+        parts.extend(safe_steps[:4])
 
     currency = _CURRENCY_AR[brief.currency]
     parts.append(_clean_sentence(f"سعر البيع هو {brief.price} {currency}"))
