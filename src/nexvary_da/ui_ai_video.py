@@ -110,8 +110,29 @@ class AIVideoManagerPanel:
             fg=PALETTE.muted,
         ).pack(anchor="w", padx=self.px(18), pady=(0, self.px(12)))
 
-        body = tk.Frame(self.window, bg=PALETTE.background)
-        body.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(10))
+        body_host = tk.Frame(self.window, bg=PALETTE.background)
+        body_host.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(10))
+        canvas = tk.Canvas(
+            body_host,
+            bg=PALETTE.background,
+            highlightthickness=0,
+            bd=0,
+        )
+        scrollbar = tk.Scrollbar(body_host, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        body = tk.Frame(canvas, bg=PALETTE.background)
+        body_window = canvas.create_window((0, 0), window=body, anchor="nw")
+        body.bind(
+            "<Configure>",
+            lambda _event: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.bind(
+            "<Configure>",
+            lambda event: canvas.itemconfigure(body_window, width=event.width),
+        )
 
         hardware = tk.Frame(body, bg=PALETTE.surface, highlightbackground=PALETTE.silver, highlightthickness=1)
         hardware.pack(fill="x")
