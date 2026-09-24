@@ -81,6 +81,15 @@ class CodeCraftTests(unittest.TestCase):
             self.assertTrue(provider.has_api_key())
         self.assertFalse((self.root / ".nexvary-da" / "secrets.json").exists())
 
+    @unittest.skipUnless(os.name == "nt", "Windows DPAPI only")
+    def test_windows_dpapi_roundtrip(self):
+        self.secrets.set("codecraft_api_key", "cc_roundtrip_test")
+        self.assertEqual("cc_roundtrip_test", self.secrets.get("codecraft_api_key"))
+        payload = (self.root / ".nexvary-da" / "secrets.json").read_text(encoding="utf-8")
+        self.assertNotIn("cc_roundtrip_test", payload)
+        self.secrets.delete("codecraft_api_key")
+        self.assertEqual("", self.secrets.get("codecraft_api_key"))
+
     def test_json_fence_and_scene_kind_normalization(self):
         fence = chr(96) * 3
         payload = _json_from_text(fence + "json\n" + '{"summary":"ok"}' + "\n" + fence)
