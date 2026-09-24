@@ -20,6 +20,7 @@ from .file_tools import FileTools
 from .github_client import GitHubRESTClient
 from .git_tools import GitTools
 from .integration_settings import IntegrationSettings
+from .instruction_image import InstructionImageInterpreter
 from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
 from .process_registry import ProcessRegistry
@@ -186,6 +187,14 @@ class ProjectRuntime:
 
     def product_ads(self) -> ProductAdComposer:
         return ProductAdComposer(self.guard, self.state, self.root)
+
+    def instruction_images(self) -> InstructionImageInterpreter:
+        return InstructionImageInterpreter(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+        )
 
     def product_research(self) -> ProductResearcher:
         return ProductResearcher(self.guard, self.state, self.root)
