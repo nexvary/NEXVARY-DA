@@ -35,6 +35,11 @@ def main() -> int:
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
     shutil.copy2(exe, stage / exe.name)
+    if sys.platform == "win32":
+        gui = DIST / "NEXVARY-DA-GUI.exe"
+        if not gui.is_file():
+            raise SystemExit(f"Windows GUI executable not found: {gui}")
+        shutil.copy2(gui, stage / gui.name)
     for name in ("README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "SECURITY_MODEL.md"):
         source = ROOT / name
         if source.is_file():
@@ -46,6 +51,10 @@ def main() -> int:
         "arch": arch,
         "executable": exe.name,
         "executable_sha256": sha256(stage / exe.name),
+        "gui_executable": "NEXVARY-DA-GUI.exe" if sys.platform == "win32" else None,
+        "gui_executable_sha256": (
+            sha256(stage / "NEXVARY-DA-GUI.exe") if sys.platform == "win32" else None
+        ),
         "signed": False,
         "signature_note": "Unsigned CI portable package. Production signing requires external signing credentials.",
     }
