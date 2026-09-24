@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from .permissions import Permission, WorkspaceGuard
+from .subprocess_policy import hidden_window_kwargs
 
 
 @dataclass(slots=True)
@@ -50,6 +51,7 @@ class ProcessRegistry:
             text=True,
             errors="replace",
             shell=False,
+            **hidden_window_kwargs(),
         )
         item = ManagedProcess(uuid.uuid4().hex, tuple(args), str(workdir), time.time(), proc.pid)
         with self._lock:
