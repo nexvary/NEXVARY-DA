@@ -98,6 +98,28 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
         app.show_experience("advanced")
         routes.append(_inspect("main.advanced", root))
 
+        for page in ("product_ad", "video", "integrations", "toolbox", "about", "system"):
+            app.show_page(page)
+            root.update_idletasks()
+            root.update()
+            route = _inspect(f"single_window.{page}", root)
+            popup_count = sum(
+                1
+                for child in root.winfo_children()
+                if str(child.winfo_class()) == "Toplevel" and bool(child.winfo_ismapped())
+            )
+            if popup_count:
+                route = NavigationRoute(
+                    route.route,
+                    False,
+                    route.widget_count,
+                    route.interactive_count,
+                    route.error_count + popup_count,
+                    (route.details + "; " if route.details else "") + f"unexpected popup windows: {popup_count}",
+                )
+            routes.append(route)
+        app.show_experience("easy")
+
         about = open_about_window(root, font_family=app.font, scale=app.scale)
         routes.append(_inspect("info.about", about.window))
         about.close()
