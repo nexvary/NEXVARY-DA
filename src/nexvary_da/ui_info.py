@@ -70,17 +70,23 @@ SYSTEM_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 
 
 class _InfoWindow:
-    def __init__(self, parent, *, title: str, font_family: str, scale: float):
+    def __init__(self, parent, *, title: str, font_family: str, scale: float, embedded: bool = False, on_back=None):
         import tkinter as tk
         self.tk = tk
         self.font = font_family
         self.scale = scale
-        self.window = tk.Toplevel(parent)
-        self.window.title(title)
-        self.window.configure(bg=PALETTE.background)
-        self.window.geometry(f"{self.px(940)}x{self.px(720)}")
-        self.window.minsize(self.px(780), self.px(580))
-        self.window.transient(parent)
+        self.embedded = bool(embedded)
+        self.on_back = on_back
+        if self.embedded:
+            self.window = tk.Frame(parent, bg=PALETTE.background)
+            self.window.pack(fill="both", expand=True)
+        else:
+            self.window = tk.Toplevel(parent)
+            self.window.title(title)
+            self.window.configure(bg=PALETTE.background)
+            self.window.geometry(f"{self.px(940)}x{self.px(720)}")
+            self.window.minsize(self.px(780), self.px(580))
+            self.window.transient(parent)
 
     def px(self, value: int) -> int:
         return max(1, int(round(value * self.scale)))
@@ -138,12 +144,15 @@ class _InfoWindow:
         return body
 
     def close(self):
+        if callable(self.on_back):
+            self.on_back()
+            return
         self.window.destroy()
 
 
 class AboutWindow(_InfoWindow):
-    def __init__(self, parent, *, font_family: str, scale: float):
-        super().__init__(parent, title="NEXVARY — About / عنا", font_family=font_family, scale=scale)
+    def __init__(self, parent, *, font_family: str, scale: float, embedded: bool = False, on_back=None):
+        super().__init__(parent, title="NEXVARY — About / عنا", font_family=font_family, scale=scale, embedded=embedded, on_back=on_back)
         self._header("ABOUT NEXVARY / عنا", "Official company information and social channels", PALETTE.cyan)
         body = self._scroll_body()
 
@@ -186,8 +195,8 @@ class AboutWindow(_InfoWindow):
 
 
 class SystemOverviewWindow(_InfoWindow):
-    def __init__(self, parent, *, font_family: str, scale: float):
-        super().__init__(parent, title="NEXVARY — System Overview / حول النظام", font_family=font_family, scale=scale)
+    def __init__(self, parent, *, font_family: str, scale: float, embedded: bool = False, on_back=None):
+        super().__init__(parent, title="NEXVARY — System Overview / حول النظام", font_family=font_family, scale=scale, embedded=embedded, on_back=on_back)
         self._header("SYSTEM OVERVIEW / حول النظام",
                      "Capabilities, security boundaries, and verification architecture", PALETTE.purple)
         body = self._scroll_body()
@@ -238,9 +247,9 @@ class SystemOverviewWindow(_InfoWindow):
         self.button(actions, "BACK / رجوع", self.close, accent=True).pack(side="right")
 
 
-def open_about_window(parent, *, font_family: str, scale: float) -> AboutWindow:
-    return AboutWindow(parent, font_family=font_family, scale=scale)
+def open_about_window(parent, *, font_family: str, scale: float, embedded: bool = False, on_back=None) -> AboutWindow:
+    return AboutWindow(parent, font_family=font_family, scale=scale, embedded=embedded, on_back=on_back)
 
 
-def open_system_overview_window(parent, *, font_family: str, scale: float) -> SystemOverviewWindow:
-    return SystemOverviewWindow(parent, font_family=font_family, scale=scale)
+def open_system_overview_window(parent, *, font_family: str, scale: float, embedded: bool = False, on_back=None) -> SystemOverviewWindow:
+    return SystemOverviewWindow(parent, font_family=font_family, scale=scale, embedded=embedded, on_back=on_back)
