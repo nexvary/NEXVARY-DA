@@ -22,8 +22,11 @@ _CURRENCY_AR = {
 }
 
 _ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+_ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v"}
 _MAX_IMAGES = 12
 _MAX_IMAGE_BYTES = 40 * 1024 * 1024
+_MAX_VIDEOS = 6
+_MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,8 +95,13 @@ def _clean_sentence(text: str) -> str:
     return value if value[-1] in ".!؟،؛" else value + "."
 
 
-def build_arabic_product_script(brief: ProductAdBrief) -> ProductAdScript:
-    """Build an Arabic sales narration without inventing product specifications."""
+def build_arabic_product_script(
+    brief: ProductAdBrief,
+    *,
+    real_video_count: int = 0,
+    verified_facts: tuple[str, ...] | list[str] = (),
+) -> ProductAdScript:
+    """Build Arabic narration from seller facts, real evidence, and source-verified facts only."""
     brief = brief.normalized()
     parts: list[str] = []
 
@@ -114,6 +122,21 @@ def build_arabic_product_script(brief: ProductAdBrief) -> ProductAdScript:
         if detail_lines:
             parts.append("ودي أهم التفاصيل اللي حابّين نوضحها لك:")
             parts.extend(detail_lines)
+
+    if int(real_video_count) > 0:
+        parts.append(
+            "والآن شاهد تسجيلًا حقيقيًا من المنتج نفسه. "
+            "ركز في الصورة والتفاصيل واحكم على الأداء بنفسك."
+        )
+
+    safe_verified = [
+        _clean_sentence(str(item))
+        for item in verified_facts
+        if str(item).strip()
+    ]
+    if safe_verified:
+        parts.append("وبالنسبة للمواصفات التي تم التحقق منها من المصادر المتاحة:")
+        parts.extend(safe_verified[:6])
 
     currency = _CURRENCY_AR[brief.currency]
     parts.append(_clean_sentence(f"سعر البيع هو {brief.price} {currency}"))
@@ -342,3 +365,130 @@ class ProductAdComposer:
             agent="Video Studio",
         )
         return frames
+
+
+    def import_selected_videos(self, selected: list[str] | tuple[str, ...]) -> list[Path]:
+        """Copy seller-provided real product/demo videos into the approved workspace."""
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        if not selected:
+            return []
+        if len(selected) > _MAX_VIDEOS:
+            raise ValueError(f"Choose no more than {_MAX_VIDEOS} real product videos")
+
+        batch = self.root / ".nexvary-da" / "product-ads" / "real-video" / uuid.uuid4().hex
+        safe_batch = self.guard.require(batch, Permission.WRITE, must_exist=False)
+        safe_batch.mkdir(parents=True, exist_ok=True)
+        imported: list[Path] = []
+
+        for index, raw in enumerate(selected, 1):
+            source = Path(raw).expanduser().resolve(strict=True)
+            if source.suffix.lower() not in _ALLOWED_VIDEO_EXTENSIONS:
+                raise ValueError(f"Unsupported product video type: {source.suffix}")
+            if source.stat().st_size > _MAX_VIDEO_BYTES:
+                raise ValueError(f"Product video is too large: {source.name}")
+            target = safe_batch / f"{index:02d}{source.suffix.lower()}"
+            shutil.copy2(source, target)
+            imported.append(target)
+
+        self.state.record_event(
+            "product_ad.real_video.imported",
+            {"count": len(imported), "folder": str(safe_batch.relative_to(self.root))},
+            agent="Video Studio",
+        )
+        return imported
+
+    def render_research_cards(
+        self,
+        brief: ProductAdBrief,
+        verified_facts: list[str] | tuple[str, ...],
+        *,
+        size: tuple[int, int] = (1080, 1920),
+    ) -> list[Path]:
+        """Render original source-grounded explainer cards for the verified product facts."""
+        brief = brief.normalized()
+        facts = [str(item).strip() for item in verified_facts if str(item).strip()][:4]
+        if not facts:
+            return []
+
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        job = self.root / ".nexvary-da" / "product-ads" / "research-cards" / uuid.uuid4().hex
+        safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
+        safe_job.mkdir(parents=True, exist_ok=True)
+
+        width, height = size
+        title_font = _font(54, bold=True)
+        body_font = _font(48, bold=False)
+        badge_font = _font(34, bold=True)
+        outputs: list[Path] = []
+
+        for index, fact in enumerate(facts, 1):
+            canvas = Image.new("RGB", size, "#07101A").convert("RGBA")
+            draw = ImageDraw.Draw(canvas)
+            draw.rounded_rectangle(
+                (60, 120, width - 60, height - 140),
+                radius=42,
+                fill="#0B1724",
+                outline="#D7E1EA",
+                width=5,
+            )
+            _draw_text(
+                draw,
+                (width - 100, 220),
+                brief.product_name or brief.model or "المنتج",
+                font=title_font,
+                fill="#18E7FF",
+                anchor="ra",
+            )
+            _draw_text(
+                draw,
+                (width - 100, 300),
+                "معلومة تم التحقق منها",
+                font=badge_font,
+                fill="#39FF88",
+                anchor="ra",
+            )
+
+            words = fact.split()
+            lines: list[str] = []
+            current: list[str] = []
+            for word in words:
+                candidate = " ".join(current + [word])
+                if len(candidate) > 31 and current:
+                    lines.append(" ".join(current))
+                    current = [word]
+                else:
+                    current.append(word)
+            if current:
+                lines.append(" ".join(current))
+
+            y = 590
+            for line in lines[:8]:
+                _draw_text(
+                    draw,
+                    (width - 115, y),
+                    line,
+                    font=body_font,
+                    fill="#F2F6FA",
+                    anchor="ra",
+                )
+                y += 78
+
+            _draw_text(
+                draw,
+                (width - 100, height - 250),
+                f"{index}/{len(facts)}",
+                font=badge_font,
+                fill="#BFCAD4",
+                anchor="ra",
+                rtl=False,
+            )
+            output = safe_job / f"research-{index:02d}.png"
+            canvas.convert("RGB").save(output, format="PNG", quality=96)
+            outputs.append(output)
+
+        self.state.record_event(
+            "product_ad.research_cards.rendered",
+            {"count": len(outputs), "folder": str(safe_job.relative_to(self.root))},
+            agent="Video Studio",
+        )
+        return outputs
