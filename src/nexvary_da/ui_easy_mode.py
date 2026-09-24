@@ -128,8 +128,8 @@ class EasyModePanel:
             self._action_card(
                 grid,
                 "Video Studio",
-                "Create 60-second Shorts/Reels with MoneyPrinterTurbo or a free local engine.",
-                "CREATE A VIDEO",
+                "Create Arabic product ads or 60-second Shorts/Reels with local/free video engines.",
+                "PRODUCT AD / VIDEO",
                 self.app.open_video_studio,
                 color=PALETTE.magenta,
                 accent=True,

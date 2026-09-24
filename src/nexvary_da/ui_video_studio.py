@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import webbrowser
 
+from .ui_product_ad import open_product_ad
 from .ui_theme import PALETTE
 from .video_studio import VideoEngineId
 
@@ -101,7 +102,26 @@ class VideoStudioWindow:
             "One-minute Shorts/Reels from a topic or script • local-first • graphical setup",
             size=8,
             fg=PALETTE.muted,
-        ).pack(anchor="w", padx=self.px(18), pady=(0, self.px(12)))
+        ).pack(anchor="w", padx=self.px(18), pady=(0, self.px(8)))
+        header_actions = tk.Frame(header, bg=PALETTE.surface)
+        header_actions.pack(fill="x", padx=self.px(18), pady=(0, self.px(12)))
+        self.button(
+            header_actions,
+            "إعلان منتج / PRODUCT AD",
+            lambda: open_product_ad(
+                self.window,
+                self.runtime,
+                font_family=self.font,
+                scale=self.scale,
+            ),
+            accent=True,
+        ).pack(side="right")
+        self.label(
+            header_actions,
+            "صور + موديل + سعر + وصف → إعلان عربي جاهز",
+            size=8,
+            fg=PALETTE.cyan,
+        ).pack(side="right", padx=self.px(10))
 
         engines = tk.Frame(self.window, bg=PALETTE.background)
         engines.pack(fill="x", padx=self.px(14), pady=self.px(10))

@@ -54,7 +54,7 @@ SYSTEM_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("Media & MCP", PALETTE.yellow, (
         "FastMCP gateway for approved MCP servers and tools.",
         "VoiceStudio external-service integration for voice workflows.",
-        "Video Studio provides a guided 60-second workflow with MoneyPrinterTurbo plus free local alternatives.",
+        "Video Studio provides a guided 60-second workflow plus an Arabic Product Ad creator using product photos, model, price and user-supplied details.",
         "Optional Qwen-Image 2.1 image runtime remains available for image workflows.",
     )),
     ("Android & GitHub", PALETTE.blue, (

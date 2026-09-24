@@ -65,6 +65,7 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
     from .ui_app import DeveloperAgentUI
     from .ui_info import open_about_window, open_system_overview_window
     from .ui_integration_center import IntegrationCenter
+    from .ui_product_ad import ProductAdWindow
     from .ui_project_dialog import open_add_project_dialog
     from .ui_toolbox import ToolBox
     from .ui_video_studio import VideoStudioWindow
@@ -131,6 +132,15 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
         )
         routes.append(_inspect("video.studio", video_studio.window))
         video_studio.window.destroy()
+
+        product_ad = ProductAdWindow(
+            root,
+            app.runtime,
+            font_family=app.font,
+            scale=app.scale,
+        )
+        routes.append(_inspect("video.product_ad", product_ad.window))
+        product_ad.window.destroy()
 
         dialog = open_add_project_dialog(
             root,

@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 500
+- Current milestone candidate: Stage 550
 
 ## Verified baseline before Stage 300
 
@@ -116,3 +116,20 @@ The candidate is accepted only after the exact Stage 400 head passes Windows and
 - API/provider secrets are not persisted by NEXVARY integration settings.
 
 Stage 500 is accepted only after the exact branch head passes Windows and Ubuntu CI, runtime UI probe, Navigation Integrity Probe, security audits, and native packaging/install smoke tests.
+
+
+## Stage 501-550 Arabic Product Ads candidate
+
+- Arabic-first Product Ad Creator integrated into Video Studio.
+- Required workflow: product photos + model/name + selling price; optional description and contact.
+- Deterministic Arabic narration uses only supplied product facts and generic call-to-action wording; it does not invent specifications.
+- Narration preview shows estimated spoken duration and warns when the supplied facts are too short for the selected target duration.
+- Product photos are explicitly imported into the approved workspace, validated as images, and transformed into 1080x1920 advertising frames.
+- Frames use a dark blurred photo background, metallic-silver product frame, neon product headline, model, and green price treatment.
+- Default Arabic voice is Microsoft Edge TTS ar-EG-SalmaNeural; ar-EG-ShakirNeural is selectable.
+- Product ads use MoneyPrinterTurbo local-material mode, so no Pexels/Pixabay key or LLM is needed for the product facts/script path.
+- MoneyPrinterTurbo is auto-prepared when CREATE AD is pressed if it is not ready.
+- Product Ad Creator is covered by Navigation Integrity Probe.
+- Pillow is now a core dependency because portrait product-frame composition is a production feature.
+
+Stage 550 is accepted only after the exact branch head passes Windows and Ubuntu CI, runtime UI probe, Navigation Integrity Probe, source/secret/dependency audits, and native packaging/install smoke tests.
