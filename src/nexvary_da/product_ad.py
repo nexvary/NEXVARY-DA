@@ -102,6 +102,7 @@ def build_arabic_product_script(
     real_video_role: str = "other",
     verified_facts: tuple[str, ...] | list[str] = (),
     setup_steps: tuple[str, ...] | list[str] = (),
+    seller_instructions: tuple[str, ...] | list[str] = (),
 ) -> ProductAdScript:
     """Build Arabic narration from seller facts, real evidence, and source-verified facts only."""
     brief = brief.normalized()
@@ -155,6 +156,15 @@ def build_arabic_product_script(
     if safe_verified:
         parts.append("وبالنسبة للمواصفات التي تم التحقق منها من المصادر المتاحة:")
         parts.extend(safe_verified[:6])
+
+    safe_seller_instructions = [
+        _clean_sentence(str(item))
+        for item in seller_instructions
+        if str(item).strip()
+    ]
+    if safe_seller_instructions:
+        parts.append("ومن التعليمات الموجودة في الصور التي أرسلتها:")
+        parts.extend(safe_seller_instructions[:8])
 
     safe_steps = [
         _clean_sentence(str(item))
