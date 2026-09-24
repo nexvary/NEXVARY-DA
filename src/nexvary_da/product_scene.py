@@ -10,6 +10,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
+from .instruction_image import InstructionScene, InstructionSceneKind
 from .permissions import Permission, WorkspaceGuard
 from .process import ProcessRunner
 from .product_ad import ProductAdBrief, _draw_text, _font
@@ -438,6 +439,215 @@ class ProductSceneDirector:
             anchor="ra",
         )
         canvas.convert("RGB").save(output, "PNG", quality=96)
+
+    def _render_instruction_card(
+        self,
+        brief: ProductAdBrief,
+        scene: InstructionScene,
+        *,
+        index: int,
+        total: int,
+        output: Path,
+    ) -> None:
+        width, height = 1080, 1920
+        canvas = Image.new("RGBA", (width, height), "#07101A")
+        draw = ImageDraw.Draw(canvas)
+        draw.rounded_rectangle(
+            (58, 110, width - 58, height - 125),
+            radius=46,
+            fill="#0B1724",
+            outline="#D7E1EA",
+            width=5,
+        )
+        _draw_text(
+            draw,
+            (width - 95, 205),
+            "شرح تلقائي من الصورة",
+            font=_font(58, bold=True),
+            fill="#18E7FF",
+            anchor="ra",
+        )
+        _draw_text(
+            draw,
+            (width - 95, 285),
+            brief.product_name or brief.model or "المنتج",
+            font=_font(36, bold=True),
+            fill="#E4EDF5",
+            anchor="ra",
+        )
+
+        # Original vector pictograms: no third-party image reuse is required.
+        icon_box = (110, 390, 970, 1010)
+        draw.rounded_rectangle(icon_box, radius=42, fill="#101F2D", outline="#39FF88", width=4)
+        kind = InstructionSceneKind(scene.kind)
+        cx, cy = 540, 700
+
+        if kind is InstructionSceneKind.SHIPPING:
+            draw.rectangle((280, 620, 650, 790), fill="#244B70", outline="#E4EDF5", width=5)
+            draw.rectangle((650, 670, 800, 790), fill="#2F648F", outline="#E4EDF5", width=5)
+            draw.ellipse((330, 760, 430, 860), fill="#07101A", outline="#39FF88", width=8)
+            draw.ellipse((680, 760, 780, 860), fill="#07101A", outline="#39FF88", width=8)
+            draw.rectangle((390, 655, 545, 745), fill="#D5A84A", outline="#F4E0A0", width=4)
+        elif kind is InstructionSceneKind.CASH_ON_DELIVERY:
+            for x in (345, 735):
+                draw.ellipse((x - 70, 500, x + 70, 640), fill="#244B70", outline="#E4EDF5", width=5)
+                draw.line((x, 640, x, 860), fill="#E4EDF5", width=14)
+                draw.line((x, 720, x - 100, 810), fill="#E4EDF5", width=12)
+                draw.line((x, 720, x + 100, 810), fill="#E4EDF5", width=12)
+            draw.rectangle((455, 650, 625, 770), fill="#D5A84A", outline="#F4E0A0", width=5)
+            draw.rounded_rectangle((540, 805, 700, 885), radius=16, fill="#39FF88")
+            _draw_text(draw, (620, 846), "نقدًا", font=_font(34, bold=True), fill="#07101A", anchor="mm")
+        elif kind is InstructionSceneKind.PICKUP:
+            draw.polygon([(260, 650), (540, 460), (820, 650)], fill="#244B70", outline="#E4EDF5")
+            draw.rectangle((300, 650, 780, 880), fill="#18334A", outline="#E4EDF5", width=5)
+            draw.rectangle((465, 700, 615, 880), fill="#D5A84A", outline="#F4E0A0", width=4)
+        elif kind is InstructionSceneKind.RESERVATION:
+            draw.rounded_rectangle((330, 500, 750, 900), radius=34, fill="#F2F7FB", outline="#39FF88", width=6)
+            draw.rectangle((330, 500, 750, 610), fill="#244B70")
+            for row in range(3):
+                for col in range(4):
+                    x0 = 375 + col * 90
+                    y0 = 660 + row * 75
+                    draw.rectangle((x0, y0, x0 + 54, y0 + 44), outline="#244B70", width=3)
+            draw.ellipse((690, 820, 820, 950), fill="#FFB347", outline="#E4EDF5", width=5)
+        elif kind is InstructionSceneKind.WARRANTY:
+            draw.polygon(
+                [(540, 470), (760, 560), (720, 820), (540, 960), (360, 820), (320, 560)],
+                fill="#153C58",
+                outline="#39FF88",
+            )
+            draw.line((435, 715, 515, 795), fill="#39FF88", width=26)
+            draw.line((515, 795, 670, 620), fill="#39FF88", width=26)
+        elif kind is InstructionSceneKind.APP:
+            draw.rounded_rectangle((385, 460, 695, 950), radius=42, fill="#050910", outline="#E4EDF5", width=7)
+            draw.rounded_rectangle((425, 545, 655, 830), radius=26, fill="#244B70")
+            draw.ellipse((505, 850, 575, 920), fill="#39FF88")
+        elif kind is InstructionSceneKind.SIM:
+            draw.polygon(
+                [(365, 520), (640, 520), (760, 640), (760, 900), (365, 900)],
+                fill="#244B70",
+                outline="#E4EDF5",
+            )
+            draw.rectangle((455, 640, 670, 820), fill="#D5A84A", outline="#F4E0A0", width=5)
+        elif kind is InstructionSceneKind.QR:
+            for ox, oy in ((350, 520), (620, 520), (350, 790)):
+                draw.rectangle((ox, oy, ox + 150, oy + 150), outline="#E4EDF5", width=18)
+                draw.rectangle((ox + 45, oy + 45, ox + 105, oy + 105), fill="#E4EDF5")
+            for x, y in ((610, 800), (680, 860), (590, 900), (745, 760), (730, 900)):
+                draw.rectangle((x, y, x + 42, y + 42), fill="#39FF88")
+        elif kind is InstructionSceneKind.CONNECTIVITY:
+            draw.ellipse((445, 700, 635, 890), fill="#244B70", outline="#E4EDF5", width=5)
+            for radius in (150, 235, 320):
+                draw.arc((cx - radius, cy - radius, cx + radius, cy + radius), 215, 325, fill="#39FF88", width=15)
+        else:
+            draw.rounded_rectangle((360, 520, 720, 900), radius=60, fill="#244B70", outline="#E4EDF5", width=6)
+            draw.ellipse((455, 620, 625, 790), fill="#07101A", outline="#39FF88", width=8)
+
+        y = 1110
+        for line in self._wrap(scene.text, 31)[:5]:
+            _draw_text(
+                draw,
+                (width - 105, y),
+                line,
+                font=_font(46, bold=True),
+                fill="#F2F7FB",
+                anchor="ra",
+            )
+            y += 76
+
+        _draw_text(
+            draw,
+            (width - 105, height - 255),
+            f"المشهد {index} من {total}",
+            font=_font(30, bold=True),
+            fill="#B8C4CE",
+            anchor="ra",
+        )
+        canvas.convert("RGB").save(output, "PNG", quality=96)
+
+    def render_instruction_storyboard(
+        self,
+        brief: ProductAdBrief,
+        scenes: list[InstructionScene] | tuple[InstructionScene, ...],
+        *,
+        seconds_per_scene: float = 3.4,
+        max_scenes: int = 8,
+    ) -> Path | None:
+        selected = [scene for scene in scenes if scene.text.strip()][:max_scenes]
+        if not selected:
+            return None
+        self.guard.require(self.root, Permission.SHELL, must_exist=True)
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        ffmpeg = self._ffmpeg_exe()
+
+        job = self.root / ".nexvary-da" / "product-ads" / "instruction-storyboard" / uuid.uuid4().hex
+        safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
+        safe_job.mkdir(parents=True, exist_ok=True)
+
+        segments: list[Path] = []
+        for index, scene in enumerate(selected, 1):
+            card = safe_job / f"instruction-{index:02d}.png"
+            self._render_instruction_card(
+                brief,
+                scene,
+                index=index,
+                total=len(selected),
+                output=card,
+            )
+            segment = safe_job / f"instruction-{index:02d}.mp4"
+            frames = max(1, int(math.ceil(seconds_per_scene * 30)))
+            fade_out = max(0.4, seconds_per_scene - 0.55)
+            filter_chain = (
+                "scale=1080:1920,"
+                f"zoompan=z='min(zoom+0.00045,1.035)':d={frames}:s=1080x1920:fps=30,"
+                "fade=t=in:st=0:d=0.30,"
+                f"fade=t=out:st={fade_out:.2f}:d=0.40,"
+                "format=yuv420p"
+            )
+            result = self.runner.run(
+                [
+                    ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+                    "-loop", "1", "-i", str(card),
+                    "-t", f"{seconds_per_scene:.2f}",
+                    "-vf", filter_chain,
+                    "-an", "-c:v", "libx264", "-preset", "medium",
+                    "-crf", "20", "-pix_fmt", "yuv420p", str(segment),
+                ],
+                cwd=self.root,
+                timeout=600,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(result.stdout[-6000:] or "Could not render instruction scene")
+            segments.append(segment)
+
+        output = safe_job / "instruction-storyboard.mp4"
+        args: list[str] = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+        for segment in segments:
+            args.extend(["-i", str(segment)])
+        joined = "".join(f"[{index}:v]" for index in range(len(segments)))
+        args.extend(
+            [
+                "-filter_complex", f"{joined}concat=n={len(segments)}:v=1:a=0[v]",
+                "-map", "[v]", "-c:v", "libx264", "-preset", "medium",
+                "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                str(output),
+            ]
+        )
+        result = self.runner.run(args, cwd=self.root, timeout=900)
+        if result.returncode != 0:
+            raise RuntimeError(result.stdout[-6000:] or "Could not assemble instruction storyboard")
+
+        self.state.record_event(
+            "product_ad.scene_director.instruction_storyboard",
+            {
+                "scene_count": len(selected),
+                "output": str(output.relative_to(self.root)),
+                "duration_seconds": round(len(selected) * seconds_per_scene, 2),
+                "scene_kinds": [scene.kind for scene in selected],
+            },
+            agent="Scene Director",
+        )
+        return output
 
     def render_operation_explainer(
         self,
