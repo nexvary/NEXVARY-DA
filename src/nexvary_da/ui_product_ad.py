@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 
 from .product_ad import ProductAdBrief, build_arabic_product_script
 from .product_scene import RealVideoAudioPolicy, RealVideoRole
@@ -55,6 +56,9 @@ class ProductAdWindow:
         self.videos_var = tk.StringVar(value="لم يتم اختيار فيديو حقيقي")
         self.instruction_images_var = tk.StringVar(value="لم يتم اختيار صور شرح أو تعليمات")
         self.research_var = tk.BooleanVar(value=True)
+        self.ai_enhanced_var = tk.BooleanVar(
+            value=settings.get("ai_enhanced_product_ads", "true").lower() == "true"
+        )
         self.selected_images: list[str] = []
         self.selected_videos: list[str] = []
         self.selected_instruction_images: list[str] = []
@@ -343,6 +347,23 @@ class ProductAdWindow:
             font=(self.font, self.px(8), "bold"),
         ).pack(fill="x", pady=(self.px(10), self.px(3)))
 
+        tk.Checkbutton(
+            controls,
+            text="AI Enhanced — حوّل تعليمات الصور إلى مشاهد AI عندما يكون المحرك جاهزًا",
+            variable=self.ai_enhanced_var,
+            onvalue=True,
+            offvalue=False,
+            bg=PALETTE.surface,
+            fg=PALETTE.purple,
+            selectcolor=PALETTE.surface_alt,
+            activebackground=PALETTE.surface,
+            activeforeground=PALETTE.purple,
+            anchor="e",
+            justify="right",
+            wraplength=self.px(320),
+            font=(self.font, self.px(8), "bold"),
+        ).pack(fill="x", pady=(self.px(3), self.px(3)))
+
         self.label(controls, "معاينة النص الذي سيُقال", size=8, fg=PALETTE.magenta, bold=True).pack(
             fill="x", pady=(self.px(10), self.px(3))
         )
@@ -516,9 +537,10 @@ class ProductAdWindow:
                         steps = int(result.get("verified_setup_steps", 0))
                         explainer = "نعم" if result.get("operation_explainer") else "لا"
                         instruction_scenes = int(result.get("instruction_scenes", 0))
+                        ai_scenes = int(result.get("ai_scene_assets", 0))
                         self.status_var.set(
                             f"تم إنشاء الإعلان بنجاح • مقاطع حقيقية: {real_videos} • "
-                            f"مشاهد من صور التعليمات: {instruction_scenes} • "
+                            f"مشاهد AI: {ai_scenes} • مشاهد من صور التعليمات: {instruction_scenes} • "
                             f"مصادر بحث: {sources} • حقائق موثقة: {facts} • "
                             f"خطوات تشغيل: {steps} • شرح متحرك: {explainer}"
                         )
@@ -544,6 +566,7 @@ class ProductAdWindow:
                     "product_ad_duration": str(brief.target_seconds),
                     "product_ad_video_role": self.video_role_var.get(),
                     "product_ad_video_audio": self.video_audio_var.get(),
+                    "ai_enhanced_product_ads": "true" if self.ai_enhanced_var.get() else "false",
                 }
             )
         except Exception as exc:
@@ -554,6 +577,7 @@ class ProductAdWindow:
         selected_videos = tuple(self.selected_videos)
         selected_instruction_images = tuple(self.selected_instruction_images)
         research_enabled = bool(self.research_var.get())
+        ai_enhanced_enabled = bool(self.ai_enhanced_var.get())
         voice_name = self.voice_var.get()
         music_mode = self.music_var.get()
         video_role = self.video_role_var.get()
@@ -592,9 +616,26 @@ class ProductAdWindow:
                 except Exception as exc:
                     instruction_warning = f"{type(exc).__name__}: {exc}"
 
+            ai_scene_assets = ()
+            ai_scene_warning = ""
+            if ai_enhanced_enabled and instruction_scenes:
+                try:
+                    settings = self.runtime.integration_settings().load()
+                    max_ai_scenes = max(1, min(8, int(settings.get("ai_max_scenes", "4") or "4")))
+                    ai_scene_assets = self.runtime.ai_scene_generator().generate(
+                        instruction_scenes,
+                        product_name=brief.product_name,
+                        model=brief.model,
+                        reference_image=imported[0] if imported else None,
+                        max_scenes=max_ai_scenes,
+                    )
+                except Exception as exc:
+                    ai_scene_warning = f"{type(exc).__name__}: {exc}"
+
+            fallback_scenes = instruction_scenes[len(ai_scene_assets):] if ai_scene_assets else instruction_scenes
             instruction_storyboard = director.render_instruction_storyboard(
                 brief,
-                instruction_scenes,
+                fallback_scenes,
             )
 
             report = None
@@ -623,6 +664,7 @@ class ProductAdWindow:
             )
 
             ordered_materials = [*frames, *prepared_real_videos]
+            ordered_materials.extend(Path(item.output) for item in ai_scene_assets)
             if instruction_storyboard is not None:
                 ordered_materials.append(instruction_storyboard)
             if operation_explainer is not None:
@@ -655,6 +697,8 @@ class ProductAdWindow:
             result["instruction_scenes"] = len(instruction_scenes)
             result["instruction_storyboard"] = instruction_storyboard is not None
             result["instruction_warning"] = instruction_warning
+            result["ai_scene_assets"] = len(ai_scene_assets)
+            result["ai_scene_warning"] = ai_scene_warning
             return result
 
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
