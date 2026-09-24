@@ -123,6 +123,9 @@ def build_parser() -> argparse.ArgumentParser:
     integrations = sub.add_parser("integrations", help="Show optional automation/media integration readiness")
     integrations.add_argument("path", nargs="?", default=".")
 
+    codecraft = sub.add_parser("codecraft-status", help="Check CodeCraft API configuration without revealing the key")
+    codecraft.add_argument("path", nargs="?", default=".")
+
     ai_hw = sub.add_parser("ai-hardware", help="Inspect hardware and AI-video engine suitability")
     ai_hw.add_argument("path", nargs="?", default=".")
 
@@ -294,6 +297,11 @@ def main(argv: list[str] | None = None) -> int:
             payload["custom_manifests"] = runtime.plugins().load_custom_manifests()
             print(json.dumps(payload, indent=2, ensure_ascii=False))
             return 0
+
+        if args.command == "codecraft-status":
+            payload = runtime.codecraft().status()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload.get("ready") is True else 2
 
         if args.command == "ai-hardware":
             router = runtime.ai_video()
