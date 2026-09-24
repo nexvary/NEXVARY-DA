@@ -10,7 +10,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "NEXVARY" }]
-dependencies = ["mcp>=2,<3", "Pillow>=10,<13"]
+dependencies = [
+    "mcp>=2,<3",
+    "Pillow>=10,<13",
+    "ddgs>=9.16,<10",
+    "trafilatura>=2.2,<3",
+]
 
 [project.optional-dependencies]
 ui-test = []
