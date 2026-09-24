@@ -96,6 +96,10 @@ jobs:
       - name: Build native executable
         run: python -m PyInstaller --noconfirm --clean --onefile --collect-all imageio_ffmpeg --name NEXVARY-DA --distpath dist-native --workpath build-native packaging/launcher.py
 
+      - name: Build windowed desktop executable
+        if: runner.os == 'Windows'
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --collect-all imageio_ffmpeg --name NEXVARY-DA-GUI --distpath dist-native --workpath build-native-gui packaging/gui_launcher.py
+
       - name: Native executable smoke test
         run: python tests/native_binary_smoke.py
 
