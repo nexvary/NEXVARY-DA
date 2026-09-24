@@ -10,6 +10,7 @@ from .agents import AgentPool
 from .ai_scene import ComfyUISceneGenerator
 from .ai_video import AIVideoRouter
 from .checkpoint import CheckpointStore
+from .codecraft import CodeCraftProvider
 from .android_profile import AndroidTools
 from .android_ui import AndroidUIHarness
 from .cua_adapter import CuaDriverAdapter
@@ -31,6 +32,7 @@ from .product_ad import ProductAdComposer
 from .product_research import ProductResearcher
 from .product_scene import ProductSceneDirector
 from .release_gate import ReleaseGate
+from .secret_store import SecretStore
 from .state import ProjectState
 from .terminal import PersistentTerminal
 from .terminal_pool import TerminalPool
@@ -150,6 +152,18 @@ class ProjectRuntime:
 
     def integration_settings(self) -> IntegrationSettings:
         return IntegrationSettings(self.guard, self.root)
+
+    def secret_store(self) -> SecretStore:
+        return SecretStore(self.guard, self.root)
+
+    def codecraft(self) -> CodeCraftProvider:
+        return CodeCraftProvider(
+            self.guard,
+            self.state,
+            self.root,
+            self.integration_settings(),
+            self.secret_store(),
+        )
 
     def plugins(self) -> PluginHub:
         return PluginHub(self.guard, self.state, self.root)
