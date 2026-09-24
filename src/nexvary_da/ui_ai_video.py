@@ -286,6 +286,14 @@ class AIVideoManagerPanel:
         self.engine_frame = tk.Frame(body, bg=PALETTE.background)
         self.engine_frame.pack(fill="both", expand=True, pady=(self.px(9), 0))
 
+        # Give the embedded canvas window a real first-layout height immediately.
+        # The navigation release gate inspects geometry before a user scroll event.
+        body.update_idletasks()
+        requested_height = max(body.winfo_reqheight(), self.px(640))
+        requested_width = max(body.winfo_reqwidth(), self.px(760))
+        canvas.itemconfigure(body_window, width=requested_width, height=requested_height)
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
         footer = tk.Frame(self.window, bg=PALETTE.surface)
         footer.pack(fill="x")
         tk.Label(
