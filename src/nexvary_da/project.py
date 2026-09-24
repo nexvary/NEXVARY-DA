@@ -25,6 +25,7 @@ from .process import ProcessRunner
 from .process_registry import ProcessRegistry
 from .plan_execution import PlanExecutionManager
 from .product_ad import ProductAdComposer
+from .product_research import ProductResearcher
 from .release_gate import ReleaseGate
 from .state import ProjectState
 from .terminal import PersistentTerminal
@@ -184,6 +185,9 @@ class ProjectRuntime:
 
     def product_ads(self) -> ProductAdComposer:
         return ProductAdComposer(self.guard, self.state, self.root)
+
+    def product_research(self) -> ProductResearcher:
+        return ProductResearcher(self.guard, self.state, self.root)
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)
