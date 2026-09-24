@@ -113,6 +113,8 @@ jobs:
           if (-not (Test-Path (Join-Path $env:NEXVARY_DA_APPDATA "Workspace\.nexvary-da\project.json"))) {
             throw "GUI launcher did not create its first-run workspace"
           }
+          $ui = Start-Process -FilePath ".\dist-native\NEXVARY-DA-GUI.exe" -ArgumentList "--ui-smoke" -Wait -PassThru
+          if ($ui.ExitCode -ne 0) { throw "Packaged GUI open-close smoke failed: $($ui.ExitCode)" }
 
       - name: Package native portable bundle
         run: python packaging/package_native.py
