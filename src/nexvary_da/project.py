@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .agents import AgentPool
+from .ai_video import AIVideoRouter
 from .checkpoint import CheckpointStore
 from .android_profile import AndroidTools
 from .android_ui import AndroidUIHarness
@@ -187,6 +188,15 @@ class ProjectRuntime:
 
     def product_ads(self) -> ProductAdComposer:
         return ProductAdComposer(self.guard, self.state, self.root)
+
+    def ai_video(self) -> AIVideoRouter:
+        return AIVideoRouter(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+            self.integration_settings(),
+        )
 
     def instruction_images(self) -> InstructionImageInterpreter:
         return InstructionImageInterpreter(
