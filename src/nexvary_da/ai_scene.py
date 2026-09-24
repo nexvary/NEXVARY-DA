@@ -89,6 +89,27 @@ def patch_comfy_workflow(
     return result
 
 
+def workflow_accepts_reference_image(workflow: dict[str, Any]) -> bool:
+    return any(
+        isinstance(node, dict)
+        and str(node.get("class_type") or "") == "LoadImage"
+        and isinstance(node.get("inputs"), dict)
+        and "image" in node["inputs"]
+        for node in workflow.values()
+    )
+
+
+def scene_to_context_prompt(scene: InstructionScene) -> str:
+    return (
+        "Professional supporting visual for a vertical commercial advertisement. "
+        f"Scene action: {scene.visual_cue.strip()}. "
+        "Do not invent or depict the advertised product itself; use a neutral parcel or empty handoff context "
+        "where necessary and leave clean visual space for the real product image to be composited separately. "
+        "Natural people and proportions, realistic commercial lighting, no logos, no watermark, "
+        "no text baked into the image, vertical 9:16 composition."
+    )
+
+
 def collect_comfy_output_records(history_entry: dict[str, Any]) -> list[dict[str, str]]:
     outputs = history_entry.get("outputs")
     if not isinstance(outputs, dict):
@@ -363,7 +384,12 @@ class ComfyUISceneGenerator:
         )
         assets: list[GeneratedSceneAsset] = []
         for index, scene in enumerate(tuple(scenes)[: max(0, int(max_scenes))], 1):
-            prompt = scene_to_prompt(scene, product_name=product_name, model=model)
+            supports_reference = workflow_accepts_reference_image(raw_workflow)
+            prompt = (
+                scene_to_prompt(scene, product_name=product_name, model=model)
+                if supports_reference and uploaded_image
+                else scene_to_context_prompt(scene)
+            )
             prefix = f"nexvary-{scene.kind}-{index:02d}-{uuid.uuid4().hex[:8]}"
             workflow = patch_comfy_workflow(
                 raw_workflow,
