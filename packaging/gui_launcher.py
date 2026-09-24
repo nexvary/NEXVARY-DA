@@ -80,7 +80,8 @@ def main(argv: list[str] | None = None) -> int:
             window = tk.Tk()
             app = DeveloperAgentUI(window, workspace)
             window.protocol("WM_DELETE_WINDOW", app.close)
-            window.after(1200, app.close)
+            # Cross multiple background refresh cycles before considering the packaged UI stable.
+            window.after(7000, app.close)
             window.mainloop()
             return 0
         launch_ui(workspace)
