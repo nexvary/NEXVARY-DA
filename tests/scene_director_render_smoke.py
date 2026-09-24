@@ -4,6 +4,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from PIL import Image
+
 from nexvary_da.instruction_image import plan_instruction_scenes
 from nexvary_da.permissions import Permission
 from nexvary_da.product_ad import ProductAdBrief
@@ -95,9 +97,21 @@ def main() -> int:
             if storyboard is None or not storyboard.is_file() or storyboard.stat().st_size <= 0:
                 raise SystemExit("Scene Director instruction storyboard was not rendered")
 
+            ai_background = root / "ai-background.png"
+            real_product = root / "real-product.png"
+            Image.new("RGB", (720, 1280), "#355577").save(ai_background)
+            Image.new("RGBA", (420, 520), (210, 180, 70, 255)).save(real_product)
+            composites = director.compose_ai_scene_assets(
+                [ai_background],
+                real_product,
+            )
+            if not composites or not composites[0].is_file() or composites[0].stat().st_size <= 0:
+                raise SystemExit("Scene Director AI product composite was not rendered")
+
             print(f"clips={len(clips)}")
             print(f"explainer={explainer}")
             print(f"instruction_storyboard={storyboard}")
+            print(f"ai_composite={composites[0]}")
             return 0
         finally:
             runtime.close()
