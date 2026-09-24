@@ -23,6 +23,21 @@ def main() -> int:
         return completed.returncode
     if "nexvary-da" not in completed.stdout.lower():
         raise SystemExit("native executable help did not identify nexvary-da")
+
+    scene = subprocess.run(
+        [str(exe.resolve()), "scene-runtime"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
+        timeout=60,
+        check=False,
+    )
+    print(scene.stdout)
+    if scene.returncode != 0:
+        return scene.returncode
+    if '"ready": true' not in scene.stdout.lower():
+        raise SystemExit("native executable does not contain the Scene Director ffmpeg runtime")
     return 0
 
 
