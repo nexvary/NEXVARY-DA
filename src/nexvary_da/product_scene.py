@@ -131,6 +131,25 @@ class ProductSceneDirector:
         self.root = Path(root).resolve(strict=True)
 
     @staticmethod
+    def media_runtime_status() -> dict[str, Any]:
+        try:
+            import imageio_ffmpeg
+
+            executable = Path(imageio_ffmpeg.get_ffmpeg_exe())
+            return {
+                "ready": executable.is_file(),
+                "ffmpeg": str(executable),
+                "source": "imageio-ffmpeg",
+            }
+        except Exception as exc:
+            return {
+                "ready": False,
+                "ffmpeg": None,
+                "source": "imageio-ffmpeg",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    @staticmethod
     def _ffmpeg_exe() -> str:
         try:
             import imageio_ffmpeg
