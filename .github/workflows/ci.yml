@@ -99,6 +99,21 @@ jobs:
       - name: Native executable smoke test
         run: python tests/native_binary_smoke.py
 
+      - name: Build Windows GUI executable
+        if: runner.os == 'Windows'
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --collect-all imageio_ffmpeg --name NEXVARY-DA-GUI --distpath dist-native --workpath build-native-gui packaging/gui_launcher.py
+
+      - name: Smoke Windows GUI executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:NEXVARY_DA_APPDATA = Join-Path $env:RUNNER_TEMP "nexvary-da-gui-smoke"
+          $p = Start-Process -FilePath ".\dist-native\NEXVARY-DA-GUI.exe" -ArgumentList "--smoke" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "GUI launcher smoke failed: $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $env:NEXVARY_DA_APPDATA "Workspace\.nexvary-da\project.json"))) {
+            throw "GUI launcher did not create its first-run workspace"
+          }
+
       - name: Package native portable bundle
         run: python packaging/package_native.py
 
