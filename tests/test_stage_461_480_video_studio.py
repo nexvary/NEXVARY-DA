@@ -31,7 +31,7 @@ class VideoStudioTests(unittest.TestCase):
             values = settings.load()
             self.assertEqual("60", values["video_duration"])
             self.assertEqual("9:16", values["video_aspect"])
-            self.assertEqual("ar", values["video_language"])
+            self.assertEqual("ar-EG", values["video_language"])
             self.assertEqual("moneyprinter", values["video_engine"])
 
     def test_engine_roots_are_non_secret_settings(self):
