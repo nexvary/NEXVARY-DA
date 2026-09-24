@@ -16,6 +16,12 @@ _ALLOWED_DEFAULTS: dict[str, str] = {
     "oya_node_root": "",
     "voicestudio_url": "http://127.0.0.1:3900",
     "moneyprinter_root": "",
+    "automated_video_root": "",
+    "shorts_generator_root": "",
+    "video_engine": "moneyprinter",
+    "video_duration": "60",
+    "video_aspect": "9:16",
+    "video_language": "ar",
     "qwen_model": "Qwen/Qwen-Image-2.1",
     "qwen_device": "cuda",
 }

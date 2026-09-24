@@ -29,6 +29,7 @@ from .state import ProjectState
 from .terminal import PersistentTerminal
 from .terminal_pool import TerminalPool
 from .validation_cache import ValidationCache
+from .video_studio import VideoStudioManager
 from .zcode_adapter import ZCodeAdapter
 
 
@@ -170,6 +171,15 @@ class ProjectRuntime:
 
     def moneyprinter(self) -> MoneyPrinterTurboAdapter:
         return MoneyPrinterTurboAdapter(self.guard, self.runner, self.state, self.root)
+
+    def video_studio(self) -> VideoStudioManager:
+        return VideoStudioManager(
+            self.guard,
+            self.runner,
+            self.processes,
+            self.state,
+            self.root,
+        )
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)
