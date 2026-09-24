@@ -13,6 +13,7 @@ from .mcp_server import run_mcp
 from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime, init_project
+from .product_scene import ProductSceneDirector
 from .project_import import ProjectImporter
 from .provenance import build_provenance, write_provenance
 from .signing_readiness import inspect_signing_readiness
@@ -158,6 +159,11 @@ def build_parser() -> argparse.ArgumentParser:
     mpt.add_argument("subject")
     mpt.add_argument("--path", default=".")
 
+    sub.add_parser(
+        "scene-runtime",
+        help="Check the bundled Product Ad Scene Director media runtime",
+    )
+
     for name, help_text in (
         ("status", "Show durable project state"),
         ("doctor", "Run non-destructive project diagnostics"),
@@ -216,6 +222,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "mcp":
         run_mcp(args.path)
         return 0
+
+    if args.command == "scene-runtime":
+        payload = ProductSceneDirector.media_runtime_status()
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0 if payload.get("ready") is True else 2
 
     runtime = ProjectRuntime(args.path)
     try:
