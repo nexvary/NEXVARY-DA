@@ -59,6 +59,9 @@ class ProductAdWindow:
         self.ai_enhanced_var = tk.BooleanVar(
             value=settings.get("ai_enhanced_product_ads", "true").lower() == "true"
         )
+        self.auto_ocr_product_images_var = tk.BooleanVar(
+            value=settings.get("auto_ocr_product_images", "true").lower() == "true"
+        )
         self.selected_images: list[str] = []
         self.selected_videos: list[str] = []
         self.selected_instruction_images: list[str] = []
@@ -364,6 +367,23 @@ class ProductAdWindow:
             font=(self.font, self.px(8), "bold"),
         ).pack(fill="x", pady=(self.px(3), self.px(3)))
 
+        tk.Checkbutton(
+            controls,
+            text="استخرج تلقائيًا التعليمات المكتوبة على صور المنتج",
+            variable=self.auto_ocr_product_images_var,
+            onvalue=True,
+            offvalue=False,
+            bg=PALETTE.surface,
+            fg=PALETTE.gold,
+            selectcolor=PALETTE.surface_alt,
+            activebackground=PALETTE.surface,
+            activeforeground=PALETTE.gold,
+            anchor="e",
+            justify="right",
+            wraplength=self.px(320),
+            font=(self.font, self.px(8), "bold"),
+        ).pack(fill="x", pady=(self.px(3), self.px(3)))
+
         self.label(controls, "معاينة النص الذي سيُقال", size=8, fg=PALETTE.magenta, bold=True).pack(
             fill="x", pady=(self.px(10), self.px(3))
         )
@@ -567,6 +587,7 @@ class ProductAdWindow:
                     "product_ad_video_role": self.video_role_var.get(),
                     "product_ad_video_audio": self.video_audio_var.get(),
                     "ai_enhanced_product_ads": "true" if self.ai_enhanced_var.get() else "false",
+                    "auto_ocr_product_images": "true" if self.auto_ocr_product_images_var.get() else "false",
                 }
             )
         except Exception as exc:
@@ -578,6 +599,7 @@ class ProductAdWindow:
         selected_instruction_images = tuple(self.selected_instruction_images)
         research_enabled = bool(self.research_var.get())
         ai_enhanced_enabled = bool(self.ai_enhanced_var.get())
+        auto_ocr_product_images = bool(self.auto_ocr_product_images_var.get())
         voice_name = self.voice_var.get()
         music_mode = self.music_var.get()
         video_role = self.video_role_var.get()
@@ -601,6 +623,7 @@ class ProductAdWindow:
             )
 
             instruction_analyses = ()
+            product_image_ocr_analyses = ()
             instruction_scenes = []
             instruction_warning = ""
             if selected_instruction_images:
@@ -608,13 +631,32 @@ class ProductAdWindow:
                     instruction_analyses = self.runtime.instruction_images().analyze(
                         selected_instruction_images
                     )
-                    instruction_scenes = [
+                    instruction_scenes.extend(
                         scene
                         for analysis in instruction_analyses
                         for scene in analysis.scenes
-                    ]
+                    )
                 except Exception as exc:
                     instruction_warning = f"{type(exc).__name__}: {exc}"
+
+            if auto_ocr_product_images:
+                try:
+                    product_image_ocr_analyses = self.runtime.instruction_images().analyze(
+                        selected_images
+                    )
+                    instruction_scenes.extend(
+                        scene
+                        for analysis in product_image_ocr_analyses
+                        for scene in analysis.scenes
+                        if scene.kind != "other"
+                    )
+                except Exception as exc:
+                    suffix = f"{type(exc).__name__}: {exc}"
+                    instruction_warning = (
+                        f"{instruction_warning} | product-image OCR: {suffix}"
+                        if instruction_warning
+                        else f"product-image OCR: {suffix}"
+                    )
 
             ai_scene_assets = ()
             ai_scene_warning = ""
@@ -701,6 +743,7 @@ class ProductAdWindow:
             result["verified_setup_steps"] = len(verified_steps)
             result["operation_explainer"] = operation_explainer is not None
             result["instruction_images"] = len(instruction_analyses)
+            result["product_images_scanned_for_text"] = len(product_image_ocr_analyses)
             result["instruction_scenes"] = len(instruction_scenes)
             result["instruction_storyboard"] = instruction_storyboard is not None
             result["instruction_warning"] = instruction_warning
