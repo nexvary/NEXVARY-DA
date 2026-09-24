@@ -632,6 +632,13 @@ class ProductAdWindow:
                 except Exception as exc:
                     ai_scene_warning = f"{type(exc).__name__}: {exc}"
 
+            ai_scene_materials = []
+            if ai_scene_assets:
+                ai_scene_materials = director.compose_ai_scene_assets(
+                    [Path(item.output) for item in ai_scene_assets],
+                    imported[0],
+                )
+
             fallback_scenes = instruction_scenes[len(ai_scene_assets):] if ai_scene_assets else instruction_scenes
             instruction_storyboard = director.render_instruction_storyboard(
                 brief,
@@ -664,7 +671,7 @@ class ProductAdWindow:
             )
 
             ordered_materials = [*frames, *prepared_real_videos]
-            ordered_materials.extend(Path(item.output) for item in ai_scene_assets)
+            ordered_materials.extend(ai_scene_materials)
             if instruction_storyboard is not None:
                 ordered_materials.append(instruction_storyboard)
             if operation_explainer is not None:
@@ -698,6 +705,7 @@ class ProductAdWindow:
             result["instruction_storyboard"] = instruction_storyboard is not None
             result["instruction_warning"] = instruction_warning
             result["ai_scene_assets"] = len(ai_scene_assets)
+            result["ai_scene_materials"] = len(ai_scene_materials)
             result["ai_scene_warning"] = ai_scene_warning
             return result
 
