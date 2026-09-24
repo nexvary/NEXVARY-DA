@@ -25,6 +25,16 @@ if (($output -join "`n") -notmatch "nexvary-da") {
     throw "unexpected installed help output"
 }
 
+$shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\NEXVARY\NEXVARY Developer Agent.lnk"
+if (-not (Test-Path $shortcut)) {
+    throw "Start Menu shortcut missing: $shortcut"
+}
+$ws = New-Object -ComObject WScript.Shell
+$targetPath = $ws.CreateShortcut($shortcut).TargetPath
+if ((Resolve-Path $targetPath).Path -ne (Resolve-Path $guiExe).Path) {
+    throw "Start Menu shortcut points to wrong executable: $targetPath"
+}
+
 $env:NEXVARY_DA_APPDATA = Join-Path $env:TEMP "nexvary-da-installed-gui-smoke"
 $guiProcess = Start-Process -FilePath $guiExe -ArgumentList "--smoke" -Wait -PassThru
 if ($guiProcess.ExitCode -ne 0) {
