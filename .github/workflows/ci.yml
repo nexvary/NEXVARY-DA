@@ -2,7 +2,7 @@ name: Core CI
 
 on:
   push:
-    branches: [main, dev/v0.1-core]
+    branches: [main, dev/v0.1-core, "dev/stage-*"]
   pull_request:
     branches: [main]
 
