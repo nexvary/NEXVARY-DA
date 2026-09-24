@@ -106,3 +106,18 @@ The desktop UI now opens in **Easy Mode** by default. Common work is presented a
 Advanced Mode keeps the terminal, agent pool, engine controls, evidence timeline, and low-level operations for engineering users.
 
 Non-secret integration paths can be configured with file/folder pickers and are stored in `.nexvary-da/integrations.json`. API keys and credentials are never persisted there.
+
+
+## Product Advertisement Mode
+
+The Video Studio includes an Arabic-first Product Advertisement workflow for real store inventory.
+
+Inputs can include product photos, exact model/name, selling price, seller-provided details/contact information, and real product/demo footage. The Scene Director can tag the real footage as a camera sample, product operation, installation test, or other real product video, select representative clips, normalize them to 9:16, and duck/mute/keep their original audio.
+
+Optional product research searches the exact model and keeps provenance for every extracted fact. Unverified claims are excluded from generated narration. When verified manual/setup steps are available, NEXVARY can create its own portrait operation explainer instead of copying arbitrary third-party instructional video.
+
+Useful diagnostic:
+
+    nexvary-da scene-runtime
+
+This verifies that the FFmpeg runtime required by Scene Director is present, including inside the native packaged executable.
