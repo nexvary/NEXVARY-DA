@@ -565,6 +565,100 @@ class ProductSceneDirector:
         )
         canvas.convert("RGB").save(output, "PNG", quality=96)
 
+    def compose_ai_scene_assets(
+        self,
+        ai_assets: list[Path] | tuple[Path, ...],
+        product_image: Path,
+        *,
+        size: tuple[int, int] = (1080, 1920),
+    ) -> list[Path]:
+        """Overlay the seller's real product image on AI-generated supporting stills.
+
+        Video outputs pass through unchanged. This prevents an unconditioned image model
+        from becoming the sole visual representation of the advertised product.
+        """
+        if not ai_assets:
+            return []
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        product_image = Path(product_image).resolve(strict=True)
+        with Image.open(product_image) as source:
+            product = source.convert("RGBA")
+
+        job = self.root / ".nexvary-da" / "product-ads" / "ai-composite" / uuid.uuid4().hex
+        safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
+        safe_job.mkdir(parents=True, exist_ok=True)
+
+        width, height = size
+        outputs: list[Path] = []
+        image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+
+        for index, raw in enumerate(ai_assets, 1):
+            path = Path(raw)
+            if path.suffix.lower() not in image_exts:
+                outputs.append(path)
+                continue
+
+            try:
+                with Image.open(path) as generated:
+                    background = generated.convert("RGB")
+            except Exception:
+                outputs.append(path)
+                continue
+
+            canvas = ImageOps.fit(background, size, method=Image.Resampling.LANCZOS).convert("RGBA")
+            shade = Image.new("RGBA", size, (0, 0, 0, 0))
+            shade_draw = ImageDraw.Draw(shade)
+            shade_draw.rectangle((0, 0, width, height), fill=(0, 0, 0, 42))
+            canvas = Image.alpha_composite(canvas, shade)
+
+            real_product = product.copy()
+            real_product.thumbnail((470, 620), Image.Resampling.LANCZOS)
+            px = width - real_product.width - 70
+            py = height - real_product.height - 180
+
+            panel = Image.new("RGBA", size, (0, 0, 0, 0))
+            panel_draw = ImageDraw.Draw(panel)
+            panel_draw.rounded_rectangle(
+                (
+                    px - 24,
+                    py - 80,
+                    px + real_product.width + 24,
+                    py + real_product.height + 28,
+                ),
+                radius=34,
+                fill=(4, 12, 20, 220),
+                outline=(57, 255, 136, 255),
+                width=5,
+            )
+            canvas = Image.alpha_composite(canvas, panel)
+            canvas.alpha_composite(real_product, (px, py))
+
+            draw = ImageDraw.Draw(canvas)
+            _draw_text(
+                draw,
+                (width - 92, py - 35),
+                "صورة المنتج الحقيقية",
+                font=_font(34, bold=True),
+                fill="#39FF88",
+                anchor="ra",
+            )
+
+            output = safe_job / f"ai-scene-{index:02d}.png"
+            canvas.convert("RGB").save(output, "PNG", quality=96)
+            outputs.append(output)
+
+        self.state.record_event(
+            "product_ad.ai_scenes.composited",
+            {
+                "input_count": len(ai_assets),
+                "output_count": len(outputs),
+                "real_product_source": str(product_image),
+                "folder": str(safe_job.relative_to(self.root)),
+            },
+            agent="Scene Director",
+        )
+        return outputs
+
     def render_instruction_storyboard(
         self,
         brief: ProductAdBrief,
