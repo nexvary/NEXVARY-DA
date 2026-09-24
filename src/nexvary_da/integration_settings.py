@@ -27,6 +27,13 @@ _ALLOWED_DEFAULTS: dict[str, str] = {
     "product_ad_duration": "60",
     "product_ad_video_role": "camera_sample",
     "product_ad_video_audio": "duck",
+    "ai_video_mode": "hybrid",
+    "ai_model_root": "",
+    "comfyui_url": "http://127.0.0.1:8188",
+    "cogvideox_root": "",
+    "framepack_root": "",
+    "ltx_root": "",
+    "wan_root": "",
     "qwen_model": "Qwen/Qwen-Image-2.1",
     "qwen_device": "cuda",
 }
