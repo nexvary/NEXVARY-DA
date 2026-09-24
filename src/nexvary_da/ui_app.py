@@ -14,6 +14,7 @@ from .ui_easy_mode import EasyModePanel
 from .ui_info import open_about_window, open_system_overview_window
 from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
+from .ui_product_ad import open_product_ad
 from .ui_toolbox import open_toolbox
 from .ui_video_studio import open_video_studio
 from .ui_terminal import TerminalPanel
@@ -31,6 +32,8 @@ class DeveloperAgentUI:
         self.tracker = ProjectChangeTracker(self.runtime.root)
         self._closing = False
         self._poll_inflight = False
+        self._embedded_page = None
+        self._current_page = "home"
         self.terminal = self.runtime.terminal_for("ui")
         self.scale = scale_for_screen(window.winfo_screenwidth(), window.winfo_screenheight())
         self.font = "Segoe UI" if window.tk.call("tk", "windowingsystem") == "win32" else "TkDefaultFont"
@@ -145,15 +148,24 @@ class DeveloperAgentUI:
         info_nav = tk.Frame(self.window, bg=PALETTE.surface,
                             highlightbackground=PALETTE.silver, highlightthickness=1)
         info_nav.pack(fill="x")
-        self.label(info_nav, "NEXVARY INFO", size=7, fg=PALETTE.muted, bold=True).pack(
+        self.label(info_nav, "MENU / القائمة", size=7, fg=PALETTE.muted, bold=True).pack(
             side="left", padx=(self.px(14), self.px(8)), pady=self.px(5)
         )
-        self.button(info_nav, "ABOUT / عنا", self.open_about).pack(
-            side="left", padx=self.px(3), pady=self.px(4)
-        )
-        self.button(info_nav, "SYSTEM / حول النظام", self.open_system_overview).pack(
-            side="left", padx=self.px(3), pady=self.px(4)
-        )
+        for label, page, accent in (
+            ("HOME", "home", True),
+            ("PRODUCT AD", "product_ad", True),
+            ("VIDEO", "video", False),
+            ("TOOLS", "toolbox", False),
+            ("SETUP", "integrations", False),
+            ("ABOUT / عنا", "about", False),
+            ("SYSTEM / حول النظام", "system", False),
+        ):
+            self.button(
+                info_nav,
+                label,
+                lambda target=page: self.show_page(target),
+                accent=accent,
+            ).pack(side="left", padx=self.px(2), pady=self.px(4))
 
         self.easy_body = self.card(self.window)
         self.easy_panel = EasyModePanel(self.easy_body, self)
@@ -174,6 +186,13 @@ class DeveloperAgentUI:
         self.window.bind("<Control-k>", lambda _e: self.clear_log())
 
     def show_experience(self, mode: str) -> None:
+        if self._embedded_page is not None:
+            try:
+                self._embedded_page.destroy()
+            except Exception:
+                pass
+            self._embedded_page = None
+        self._current_page = "home"
         selected = "advanced" if mode == "advanced" else "easy"
         self.experience.set(selected)
         self.easy_body.pack_forget()
@@ -184,36 +203,85 @@ class DeveloperAgentUI:
         else:
             self.advanced_body.pack(fill="both", expand=True)
 
+    def _embedded_back(self):
+        self.show_experience(self.experience.get())
+
+    def show_page(self, page: str):
+        target = str(page or "home").strip().lower()
+        if target == "home":
+            self.show_experience(self.experience.get())
+            return None
+
+        self.easy_body.pack_forget()
+        self.advanced_body.pack_forget()
+        if self._embedded_page is not None:
+            try:
+                self._embedded_page.destroy()
+            except Exception:
+                pass
+        self._embedded_page = self.tk.Frame(self.window, bg=PALETTE.background)
+        self._embedded_page.pack(fill="both", expand=True)
+        self._current_page = target
+
+        common = {
+            "font_family": self.font,
+            "scale": self.scale,
+            "embedded": True,
+            "on_back": self._embedded_back,
+        }
+        if target == "product_ad":
+            return open_product_ad(
+                self._embedded_page,
+                self.runtime,
+                **common,
+            )
+        if target == "video":
+            return open_video_studio(
+                self._embedded_page,
+                self.runtime,
+                navigate=self.show_page,
+                **common,
+            )
+        if target == "integrations":
+            return open_integration_center(
+                self._embedded_page,
+                self.runtime,
+                on_change=self.refresh_all_integrations,
+                **common,
+            )
+        if target == "toolbox":
+            return open_toolbox(
+                self._embedded_page,
+                self.runtime,
+                **common,
+            )
+        if target == "about":
+            return open_about_window(
+                self._embedded_page,
+                **common,
+            )
+        if target == "system":
+            return open_system_overview_window(
+                self._embedded_page,
+                **common,
+            )
+        self.show_experience(self.experience.get())
+        return None
+
     def open_about(self):
-        return open_about_window(self.window, font_family=self.font, scale=self.scale)
+        return self.show_page("about")
 
     def open_system_overview(self):
-        return open_system_overview_window(self.window, font_family=self.font, scale=self.scale)
+        return self.show_page("system")
 
     def open_integrations(self) -> None:
-        open_integration_center(
-            self.window,
-            self.runtime,
-            font_family=self.font,
-            scale=self.scale,
-            on_change=self.refresh_all_integrations,
-        )
+        self.show_page("integrations")
 
     def open_toolbox(self) -> None:
-        open_toolbox(
-            self.window,
-            self.runtime,
-            font_family=self.font,
-            scale=self.scale,
-        )
+        self.show_page("toolbox")
 
     def open_video_studio(self):
-        return open_video_studio(
-            self.window,
-            self.runtime,
-            font_family=self.font,
-            scale=self.scale,
-        )
+        return self.show_page("video")
 
     def run_release_check(self) -> None:
         self.mode.set(WorkMode.RELEASE.value)
@@ -516,6 +584,12 @@ class DeveloperAgentUI:
         if self._closing:
             return
         self._closing = True
+        if self._embedded_page is not None:
+            try:
+                self._embedded_page.destroy()
+            except Exception:
+                pass
+            self._embedded_page = None
         self.runtime.state.set_meta("ui.geometry",self.window.geometry())
         self.runtime.state.set_meta("ui.mode",self.mode.get())
         self.runtime.state.set_meta("ui.engine",self.engine.get())
