@@ -15,6 +15,7 @@ dependencies = [
     "Pillow>=10,<13",
     "ddgs>=9.16,<10",
     "trafilatura>=2.2,<3",
+    "imageio-ffmpeg>=0.6,<0.7",
 ]
 
 [project.optional-dependencies]
