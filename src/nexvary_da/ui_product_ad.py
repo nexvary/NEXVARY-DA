@@ -11,7 +11,7 @@ from .video_studio import VideoEngineId
 class ProductAdWindow:
     """Arabic-first product advertisement workflow backed by MoneyPrinterTurbo."""
 
-    def __init__(self, parent, runtime, *, font_family: str, scale: float):
+    def __init__(self, parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None):
         import tkinter as tk
         from tkinter import filedialog
 
@@ -22,12 +22,18 @@ class ProductAdWindow:
         self.composer = runtime.product_ads()
         self.font = font_family
         self.scale = scale
-        self.window = tk.Toplevel(parent)
-        self.window.title("NEXVARY — إعلان منتج")
-        self.window.configure(bg=PALETTE.background)
-        self.window.geometry(f"{self.px(1180)}x{self.px(820)}")
-        self.window.minsize(self.px(980), self.px(720))
-        self.window.transient(parent)
+        self.embedded = bool(embedded)
+        self.on_back = on_back
+        if self.embedded:
+            self.window = tk.Frame(parent, bg=PALETTE.background)
+            self.window.pack(fill="both", expand=True)
+        else:
+            self.window = tk.Toplevel(parent)
+            self.window.title("NEXVARY — إعلان منتج")
+            self.window.configure(bg=PALETTE.background)
+            self.window.geometry(f"{self.px(1180)}x{self.px(820)}")
+            self.window.minsize(self.px(980), self.px(720))
+            self.window.transient(parent)
 
         settings = runtime.integration_settings().load()
         self.product_name_var = tk.StringVar(value="")
@@ -369,9 +375,15 @@ class ProductAdWindow:
             wraplength=self.px(900),
             font=(self.font, self.px(8)),
         ).pack(side="right", fill="x", expand=True, padx=self.px(14), pady=self.px(9))
-        self.button(footer, "رجوع", self.window.destroy, accent=True).pack(
+        self.button(footer, "رجوع", self.close, accent=True).pack(
             side="left", padx=self.px(10), pady=self.px(7)
         )
+
+    def close(self):
+        if callable(self.on_back):
+            self.on_back()
+            return
+        self.window.destroy()
 
     def choose_images(self):
         files = self.filedialog.askopenfilenames(
@@ -648,5 +660,12 @@ class ProductAdWindow:
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
 
 
-def open_product_ad(parent, runtime, *, font_family: str, scale: float) -> ProductAdWindow:
-    return ProductAdWindow(parent, runtime, font_family=font_family, scale=scale)
+def open_product_ad(parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None) -> ProductAdWindow:
+    return ProductAdWindow(
+        parent,
+        runtime,
+        font_family=font_family,
+        scale=scale,
+        embedded=embedded,
+        on_back=on_back,
+    )
