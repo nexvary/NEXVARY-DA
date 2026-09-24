@@ -34,6 +34,15 @@ class AIVideoManagerPanel:
 
         settings = self.store.load()
         self.mode_var = tk.StringVar(value=settings.get("ai_video_mode", AIVideoMode.HYBRID.value))
+        self.brain_var = tk.StringVar(value=settings.get("ai_brain", "auto"))
+        self.codecraft_base_url_var = tk.StringVar(
+            value=settings.get("codecraft_base_url", "https://www.codecraftapi.com/v1")
+        )
+        self.codecraft_model_var = tk.StringVar(value=settings.get("codecraft_model", ""))
+        self.codecraft_key_var = tk.StringVar(value="")
+        self.codecraft_status_var = tk.StringVar(
+            value="KEY SAVED" if runtime.codecraft().has_api_key() else "KEY NOT CONFIGURED"
+        )
         self.model_root_var = tk.StringVar(value=settings.get("ai_model_root", ""))
         self.comfy_url_var = tk.StringVar(value=settings.get("comfyui_url", "http://127.0.0.1:8188"))
         self.workflow_var = tk.StringVar(value=settings.get("comfyui_workflow_path", ""))
@@ -144,6 +153,76 @@ class AIVideoManagerPanel:
                 pady=self.px(5),
                 font=(self.font, self.px(7), "bold"),
             ).pack(side="left", padx=self.px(2))
+
+        brain_row = tk.Frame(config, bg=PALETTE.surface)
+        brain_row.pack(fill="x", padx=self.px(12), pady=(0, self.px(6)))
+        self.label(brain_row, "AI BRAIN", size=8, fg=PALETTE.cyan, bold=True).pack(
+            side="left", padx=(0, self.px(8))
+        )
+        for label, value in (("AUTO", "auto"), ("CODECRAFT", "codecraft"), ("LOCAL", "local")):
+            tk.Radiobutton(
+                brain_row,
+                text=label,
+                variable=self.brain_var,
+                value=value,
+                indicatoron=False,
+                bg=PALETTE.surface_alt,
+                fg=PALETTE.text,
+                selectcolor=PALETTE.cyan,
+                activebackground=PALETTE.surface_glow,
+                activeforeground=PALETTE.text,
+                relief="flat",
+                bd=0,
+                padx=self.px(10),
+                pady=self.px(5),
+                font=(self.font, self.px(7), "bold"),
+            ).pack(side="left", padx=self.px(2))
+
+        codecraft = tk.Frame(
+            config,
+            bg=PALETTE.surface_alt,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        codecraft.pack(fill="x", padx=self.px(12), pady=(0, self.px(8)))
+        self.label(codecraft, "CODECRAFT AI PROVIDER", size=9, fg=PALETTE.gold, bold=True).pack(
+            anchor="w", padx=self.px(10), pady=(self.px(8), self.px(3))
+        )
+        self._text_row(codecraft, "BASE URL", self.codecraft_base_url_var)
+        self._text_row(codecraft, "MODEL ID (blank = auto)", self.codecraft_model_var)
+
+        key_row = tk.Frame(codecraft, bg=PALETTE.surface_alt)
+        key_row.pack(fill="x", padx=self.px(12), pady=(self.px(3), self.px(4)))
+        self.label(key_row, "API KEY", size=7, fg=PALETTE.muted, bold=True).pack(
+            side="left", padx=(0, self.px(8))
+        )
+        tk.Entry(
+            key_row,
+            textvariable=self.codecraft_key_var,
+            show="•",
+            bg=PALETTE.surface,
+            fg=PALETTE.text,
+            insertbackground=PALETTE.action,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=PALETTE.silver,
+            font=(self.font, self.px(8)),
+        ).pack(side="left", fill="x", expand=True, ipady=self.px(4))
+        self.button(key_row, "SAVE KEY", self.save_codecraft_key, accent=True).pack(
+            side="left", padx=(self.px(6), 0)
+        )
+        self.button(key_row, "TEST", self.test_codecraft).pack(side="left", padx=(self.px(5), 0))
+        self.button(key_row, "CLEAR", self.clear_codecraft_key).pack(side="left", padx=(self.px(5), 0))
+        tk.Label(
+            codecraft,
+            textvariable=self.codecraft_status_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.cyan,
+            anchor="w",
+            justify="left",
+            font=(self.font, self.px(7), "bold"),
+        ).pack(fill="x", padx=self.px(12), pady=(0, self.px(7)))
 
         self._path_row(config, "MODEL STORAGE", self.model_root_var, directory=True)
         self._text_row(config, "COMFYUI API", self.comfy_url_var)
@@ -334,11 +413,63 @@ class AIVideoManagerPanel:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def save_codecraft_key(self):
+        value = self.codecraft_key_var.get().strip()
+        if not value:
+            self.codecraft_status_var.set("Paste the cc_ API key first.")
+            return
+        try:
+            self.runtime.codecraft().save_api_key(value)
+            self.codecraft_key_var.set("")
+            self.codecraft_status_var.set("KEY SAVED SECURELY FOR THIS WINDOWS USER")
+        except Exception as exc:
+            self.codecraft_status_var.set(f"KEY SAVE FAILED • {type(exc).__name__}: {exc}")
+
+    def clear_codecraft_key(self):
+        try:
+            self.runtime.codecraft().delete_api_key()
+            self.codecraft_key_var.set("")
+            self.codecraft_status_var.set("KEY REMOVED")
+        except Exception as exc:
+            self.codecraft_status_var.set(f"KEY REMOVE FAILED • {type(exc).__name__}: {exc}")
+
+    def test_codecraft(self):
+        self.codecraft_status_var.set("TESTING CODECRAFT…")
+        try:
+            self.store.save(
+                {
+                    "codecraft_base_url": self.codecraft_base_url_var.get(),
+                    "codecraft_model": self.codecraft_model_var.get(),
+                    "ai_brain": self.brain_var.get(),
+                }
+            )
+        except Exception as exc:
+            self.codecraft_status_var.set(f"SETTINGS ERROR • {type(exc).__name__}: {exc}")
+            return
+
+        def worker():
+            status = self.runtime.codecraft().status()
+            def done():
+                if status.get("ready"):
+                    self.codecraft_status_var.set(
+                        f"CONNECTED • {status.get('models', 0)} models • "
+                        f"{status.get('vision_models', 0)} vision models"
+                    )
+                else:
+                    self.codecraft_status_var.set(
+                        "NOT READY • " + str(status.get("reason") or "unknown error")
+                    )
+            self.window.after(0, done)
+        threading.Thread(target=worker, daemon=True).start()
+
     def save(self):
         try:
             self.store.save(
                 {
                     "ai_video_mode": self.mode_var.get(),
+                    "ai_brain": self.brain_var.get(),
+                    "codecraft_base_url": self.codecraft_base_url_var.get(),
+                    "codecraft_model": self.codecraft_model_var.get(),
                     "ai_model_root": self.model_root_var.get(),
                     "comfyui_url": self.comfy_url_var.get(),
                     "comfyui_workflow_path": self.workflow_var.get(),
