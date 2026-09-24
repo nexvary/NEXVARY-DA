@@ -18,7 +18,7 @@ _ENGINE_COLORS = {
 class VideoStudioWindow:
     """Guided one-minute video creation and local-engine setup."""
 
-    def __init__(self, parent, runtime, *, font_family: str, scale: float):
+    def __init__(self, parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None, navigate=None):
         import tkinter as tk
         from tkinter import filedialog
 
@@ -28,12 +28,19 @@ class VideoStudioWindow:
         self.manager = runtime.video_studio()
         self.font = font_family
         self.scale = scale
-        self.window = tk.Toplevel(parent)
-        self.window.title("NEXVARY — Video Studio")
-        self.window.configure(bg=PALETTE.background)
-        self.window.geometry(f"{self.px(1180)}x{self.px(790)}")
-        self.window.minsize(self.px(980), self.px(700))
-        self.window.transient(parent)
+        self.embedded = bool(embedded)
+        self.on_back = on_back
+        self.navigate = navigate
+        if self.embedded:
+            self.window = tk.Frame(parent, bg=PALETTE.background)
+            self.window.pack(fill="both", expand=True)
+        else:
+            self.window = tk.Toplevel(parent)
+            self.window.title("NEXVARY — Video Studio")
+            self.window.configure(bg=PALETTE.background)
+            self.window.geometry(f"{self.px(1180)}x{self.px(790)}")
+            self.window.minsize(self.px(980), self.px(700))
+            self.window.transient(parent)
 
         settings = runtime.integration_settings().load()
         self.engine_var = tk.StringVar(value=settings.get("video_engine", VideoEngineId.MONEYPRINTER.value))
@@ -108,11 +115,15 @@ class VideoStudioWindow:
         self.button(
             header_actions,
             "إعلان منتج / PRODUCT AD",
-            lambda: open_product_ad(
-                self.window,
-                self.runtime,
-                font_family=self.font,
-                scale=self.scale,
+            lambda: (
+                self.navigate("product_ad")
+                if callable(self.navigate)
+                else open_product_ad(
+                    self.window,
+                    self.runtime,
+                    font_family=self.font,
+                    scale=self.scale,
+                )
             ),
             accent=True,
         ).pack(side="right")
@@ -281,9 +292,15 @@ class VideoStudioWindow:
             wraplength=self.px(900),
             font=(self.font, self.px(8)),
         ).pack(side="left", fill="x", expand=True, padx=self.px(14), pady=self.px(9))
-        self.button(footer, "BACK / رجوع", self.window.destroy, accent=True).pack(
+        self.button(footer, "BACK / رجوع", self.close, accent=True).pack(
             side="right", padx=self.px(10), pady=self.px(7)
         )
+
+    def close(self):
+        if callable(self.on_back):
+            self.on_back()
+            return
+        self.window.destroy()
 
     def _choice(self, parent, title, variable, values, color):
         self.label(parent, title, size=8, fg=color, bold=True).pack(anchor="w", pady=(self.px(8), self.px(3)))
@@ -417,5 +434,13 @@ class VideoStudioWindow:
         )
 
 
-def open_video_studio(parent, runtime, *, font_family: str, scale: float) -> VideoStudioWindow:
-    return VideoStudioWindow(parent, runtime, font_family=font_family, scale=scale)
+def open_video_studio(parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None, navigate=None) -> VideoStudioWindow:
+    return VideoStudioWindow(
+        parent,
+        runtime,
+        font_family=font_family,
+        scale=scale,
+        embedded=embedded,
+        on_back=on_back,
+        navigate=navigate,
+    )
