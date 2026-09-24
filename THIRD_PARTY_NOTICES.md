@@ -54,3 +54,14 @@ NEXVARY-DA interoperates with these engines as separately installed checkouts. T
 - ShortsGenerator — https://github.com/leamsigc/ShortsGenerator — MIT — reviewed commit `7b83166f728dc92b426b64242546a5ab77c81149`.
 
 Third-party stock media, models, voices, and APIs used by those engines retain their own terms. NEXVARY-DA does not persist stock-provider or model-provider API keys in its integration settings.
+
+
+## Product Ad research and Scene Director runtime
+
+The Product Advertisement pipeline uses the following open-source Python packages as normal runtime dependencies:
+
+- DDGS — https://pypi.org/project/ddgs/ — MIT — metasearch used to discover candidate manufacturer/manual sources.
+- Trafilatura 2.x — https://pypi.org/project/trafilatura/ — Apache-2.0 — text extraction from candidate product pages.
+- imageio-ffmpeg 0.6.x — https://pypi.org/project/imageio-ffmpeg/ — BSD-2-Clause — provides the cross-platform FFmpeg binary used for local clip preparation and motion-graphic rendering.
+
+Search results and extracted product claims are not treated as automatically true. NEXVARY keeps source URLs and only promotes a claim or setup step into generated narration when it meets the product-research verification rule.
