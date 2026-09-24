@@ -38,6 +38,9 @@ jobs:
       - name: CLI smoke test
         run: python -m nexvary_da --help
 
+      - name: Scene Director media smoke
+        run: python tests/scene_director_render_smoke.py
+
       - name: Diff check
         run: git diff --check
 
