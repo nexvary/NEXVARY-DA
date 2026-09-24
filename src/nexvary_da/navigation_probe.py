@@ -98,7 +98,7 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
         app.show_experience("advanced")
         routes.append(_inspect("main.advanced", root))
 
-        for page in ("product_ad", "video", "integrations", "toolbox", "about", "system"):
+        for page in ("product_ad", "ai_models", "video", "integrations", "toolbox", "about", "system"):
             app.show_page(page)
             root.update_idletasks()
             root.update()
