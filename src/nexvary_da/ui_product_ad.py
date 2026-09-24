@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 
 from .product_ad import ProductAdBrief, build_arabic_product_script
+from .product_scene import RealVideoAudioPolicy, RealVideoRole
 from .ui_theme import PALETTE
 from .video_studio import VideoEngineId
 
@@ -37,6 +38,12 @@ class ProductAdWindow:
         self.duration_var = tk.StringVar(value=settings.get("product_ad_duration", "60"))
         self.voice_var = tk.StringVar(value=settings.get("product_ad_voice", "ar-EG-SalmaNeural"))
         self.music_var = tk.StringVar(value="random")
+        self.video_role_var = tk.StringVar(
+            value=settings.get("product_ad_video_role", RealVideoRole.CAMERA_SAMPLE.value)
+        )
+        self.video_audio_var = tk.StringVar(
+            value=settings.get("product_ad_video_audio", RealVideoAudioPolicy.DUCK.value)
+        )
         self.status_var = tk.StringVar(value="أدخل بيانات المنتج وأضف الصور والفيديو الحقيقي ثم اضغط معاينة النص.")
         self.images_var = tk.StringVar(value="لم يتم اختيار صور")
         self.videos_var = tk.StringVar(value="لم يتم اختيار فيديو حقيقي")
@@ -138,7 +145,7 @@ class ProductAdWindow:
         )
         self.label(
             header,
-            "صور المنتج + الموديل + السعر + التفاصيل → تعليق صوتي عربي → فيديو إعلان عمودي",
+            "صور المنتج + فيديو حقيقي + بحث موثق + شرح تشغيل → تعليق صوتي عربي → إعلان عمودي",
             size=8,
             fg=PALETTE.muted,
         ).pack(fill="x", padx=self.px(18), pady=(0, self.px(12)))
@@ -263,6 +270,29 @@ class ProductAdWindow:
             (("عشوائية", "random"), ("بدون", "none")),
             PALETTE.purple,
         )
+        self._choice(
+            controls,
+            "نوع الفيديو الحقيقي",
+            self.video_role_var,
+            (
+                ("عينة كاميرا", RealVideoRole.CAMERA_SAMPLE.value),
+                ("تشغيل", RealVideoRole.PRODUCT_OPERATION.value),
+                ("تركيب", RealVideoRole.INSTALLATION_TEST.value),
+                ("أخرى", RealVideoRole.OTHER.value),
+            ),
+            PALETTE.orange,
+        )
+        self._choice(
+            controls,
+            "صوت الفيديو الحقيقي أثناء التعليق",
+            self.video_audio_var,
+            (
+                ("خفض", RealVideoAudioPolicy.DUCK.value),
+                ("كتم", RealVideoAudioPolicy.MUTE.value),
+                ("إبقاء", RealVideoAudioPolicy.KEEP.value),
+            ),
+            PALETTE.gold,
+        )
 
         tk.Checkbutton(
             controls,
@@ -287,7 +317,7 @@ class ProductAdWindow:
         self.script_preview = tk.Text(
             controls,
             width=37,
-            height=15,
+            height=9,
             wrap="word",
             bg=PALETTE.terminal,
             fg=PALETTE.text,
@@ -368,6 +398,7 @@ class ProductAdWindow:
             script = build_arabic_product_script(
                 self._brief(),
                 real_video_count=len(self.selected_videos),
+                real_video_role=self.video_role_var.get(),
             )
             if self.script_preview is not None:
                 self.script_preview.configure(state="normal")
@@ -391,9 +422,12 @@ class ProductAdWindow:
                         sources = int(result.get("research_sources", 0))
                         facts = int(result.get("verified_facts", 0))
                         real_videos = int(result.get("real_videos", 0))
+                        steps = int(result.get("verified_setup_steps", 0))
+                        explainer = "نعم" if result.get("operation_explainer") else "لا"
                         self.status_var.set(
-                            f"تم إنشاء الإعلان بنجاح • فيديو حقيقي: {real_videos} • "
-                            f"مصادر بحث: {sources} • حقائق موثقة: {facts}"
+                            f"تم إنشاء الإعلان بنجاح • مقاطع حقيقية: {real_videos} • "
+                            f"مصادر بحث: {sources} • حقائق موثقة: {facts} • "
+                            f"خطوات تشغيل: {steps} • شرح متحرك: {explainer}"
                         )
                     else:
                         self.status_var.set("انتهى المحرك بخطأ. افتح Advanced Mode لعرض التفاصيل.")
@@ -415,6 +449,8 @@ class ProductAdWindow:
                     "product_ad_currency": brief.currency,
                     "product_ad_voice": self.voice_var.get(),
                     "product_ad_duration": str(brief.target_seconds),
+                    "product_ad_video_role": self.video_role_var.get(),
+                    "product_ad_video_audio": self.video_audio_var.get(),
                 }
             )
         except Exception as exc:
@@ -426,6 +462,8 @@ class ProductAdWindow:
         research_enabled = bool(self.research_var.get())
         voice_name = self.voice_var.get()
         music_mode = self.music_var.get()
+        video_role = self.video_role_var.get()
+        video_audio = self.video_audio_var.get()
 
         def work():
             status = self.manager.status(VideoEngineId.MONEYPRINTER)
@@ -434,25 +472,44 @@ class ProductAdWindow:
 
             imported = self.composer.import_selected_images(selected_images)
             frames = self.composer.render_frames(imported, brief)
-            real_videos = self.composer.import_selected_videos(selected_videos)
+            real_video_sources = self.composer.import_selected_videos(selected_videos)
+
+            director = self.runtime.product_scene_director()
+            prepared_real_videos = director.prepare_real_videos(
+                real_video_sources,
+                role=video_role,
+                audio_policy=video_audio,
+                clip_seconds=8.0,
+            )
 
             report = None
             verified_facts: tuple[str, ...] = ()
+            verified_steps: tuple[str, ...] = ()
             if research_enabled:
                 report = self.runtime.product_research().research(
                     brief.product_name,
                     brief.model,
                 )
                 verified_facts = tuple(item.arabic for item in report.verified_facts)
+                verified_steps = tuple(item.arabic for item in report.verified_setup_steps)
 
             research_cards = self.composer.render_research_cards(brief, verified_facts)
+            operation_explainer = director.render_operation_explainer(
+                brief,
+                verified_steps,
+            )
             script = build_arabic_product_script(
                 brief,
-                real_video_count=len(real_videos),
+                real_video_count=len(prepared_real_videos),
+                real_video_role=video_role,
                 verified_facts=verified_facts,
+                setup_steps=verified_steps,
             )
 
-            ordered_materials = [*frames, *real_videos, *research_cards]
+            ordered_materials = [*frames, *prepared_real_videos]
+            if operation_explainer is not None:
+                ordered_materials.append(operation_explainer)
+            ordered_materials.extend(research_cards)
             materials = ",".join(str(path) for path in ordered_materials)
             result = self.manager.create_moneyprinter(
                 subject=brief.product_name or brief.model,
@@ -470,9 +527,12 @@ class ProductAdWindow:
                 subtitle_enabled=True,
                 voice_rate=1.02,
             )
-            result["real_videos"] = len(real_videos)
+            result["real_videos"] = len(prepared_real_videos)
+            result["real_video_sources"] = len(real_video_sources)
             result["research_sources"] = len(report.sources) if report else 0
             result["verified_facts"] = len(verified_facts)
+            result["verified_setup_steps"] = len(verified_steps)
+            result["operation_explainer"] = operation_explainer is not None
             return result
 
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
