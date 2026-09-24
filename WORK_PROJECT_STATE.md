@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 460
+- Current milestone candidate: Stage 500
 
 ## Verified baseline before Stage 300
 
@@ -100,3 +100,19 @@ The candidate is accepted only after the exact Stage 400 head passes Windows and
 - Dedicated Navigation Integrity Probe opens every registered window, integration page, Tool Box category, and Add Project dialog.
 - Strict Release Gate requires current navigation evidence for the NEXVARY desktop UI.
 - CI adds dependency vulnerability auditing with pip-audit while retaining source/secret/workspace/UI/package checks.
+
+
+## Stage 461-500 Video Studio candidate
+
+- Dedicated graphical Video Studio for approximately one-minute Shorts/Reels.
+- Defaults: 60 seconds, 9:16 portrait, Arabic, MoneyPrinterTurbo.
+- Three reviewed MIT engines: MoneyPrinterTurbo, Automated Video Generator, and ShortsGenerator.
+- One-click Prepare flow clones each external engine at a reviewed immutable commit inside the approved workspace and installs its project dependencies when prerequisites are present.
+- One-click Start/Open flow launches local WebUI processes through the managed process registry.
+- Direct MoneyPrinterTurbo creation supports topic or complete script, target narration duration, aspect ratio, language, stock/local visual source, optional voice id, and local material files.
+- Automated Video Generator is the preferred keyless/free fallback; ShortsGenerator is an additional local alternative.
+- Video Studio is exposed directly from Easy Mode.
+- Navigation Integrity Probe opens and validates the Video Studio window.
+- API/provider secrets are not persisted by NEXVARY integration settings.
+
+Stage 500 is accepted only after the exact branch head passes Windows and Ubuntu CI, runtime UI probe, Navigation Integrity Probe, security audits, and native packaging/install smoke tests.

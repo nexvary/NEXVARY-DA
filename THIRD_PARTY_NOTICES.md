@@ -43,3 +43,14 @@ These projects are interoperated with as separately installed tools/services. NE
 - VoiceStudio — https://github.com/debpalash/VoiceStudio — AGPL-3.0-only. NEXVARY uses external API interoperability and does not vendor VoiceStudio.
 - Qwen-Image 2.1 — https://github.com/QwenLM/Qwen-Image-2.1 — Qwen Research License Agreement. The reviewed upstream license limits the model materials to non-commercial use unless a separate commercial license is obtained. NEXVARY does not bundle the model weights.
 - MoneyPrinterTurbo — https://github.com/harry0703/MoneyPrinterTurbo — MIT. NEXVARY invokes a separately installed workspace checkout.
+
+
+## Optional Video Studio engines
+
+NEXVARY-DA interoperates with these engines as separately installed checkouts. The Video Studio setup flow pins a reviewed commit and does not vendor their source into NEXVARY-DA.
+
+- MoneyPrinterTurbo — https://github.com/harry0703/MoneyPrinterTurbo — MIT — reviewed commit `f2d44d62721aeaecb1898488a3bc06399da2168d`.
+- Automated Video Generator — https://github.com/itsPremkumar/Automated-Video-Generator — MIT — reviewed commit `68db464f03761ec7a2def2d722931dd636280ddb`.
+- ShortsGenerator — https://github.com/leamsigc/ShortsGenerator — MIT — reviewed commit `7b83166f728dc92b426b64242546a5ab77c81149`.
+
+Third-party stock media, models, voices, and APIs used by those engines retain their own terms. NEXVARY-DA does not persist stock-provider or model-provider API keys in its integration settings.
