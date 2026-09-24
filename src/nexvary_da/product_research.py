@@ -40,19 +40,39 @@ class ResearchFact:
 
 
 @dataclass(frozen=True, slots=True)
+class ResearchStep:
+    key: str
+    arabic: str
+    evidence: str
+    source_urls: tuple[str, ...]
+    verified: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
 class ProductResearchReport:
     query: str
     sources: tuple[ResearchSource, ...]
     facts: tuple[ResearchFact, ...]
+    setup_steps: tuple[ResearchStep, ...]
     warnings: tuple[str, ...]
 
     @property
     def verified_facts(self) -> tuple[ResearchFact, ...]:
         return tuple(item for item in self.facts if item.verified)
 
+    @property
+    def verified_setup_steps(self) -> tuple[ResearchStep, ...]:
+        return tuple(item for item in self.setup_steps if item.verified)
+
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["verified_facts"] = [item.to_dict() for item in self.verified_facts]
+        payload["verified_setup_steps"] = [
+            item.to_dict() for item in self.verified_setup_steps
+        ]
         return payload
 
 
@@ -131,6 +151,73 @@ def extract_fact_candidates(text: str) -> list[tuple[str, str, str]]:
     return found
 
 
+def extract_setup_candidates(text: str) -> list[tuple[str, str, str]]:
+    """Extract setup/operation steps conservatively from manual-style text."""
+    value = re.sub(r"\s+", " ", text or "")
+    sentences = [
+        item.strip()
+        for item in re.split(r"(?<=[.!?])\s+|[\r\n]+", value)
+        if item.strip()
+    ]
+    found: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+
+    patterns: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+        (
+            "power",
+            "وصّل المنتج بالطاقة وشغّله كما يوضح دليل الشركة.",
+            ("power on", "turn on", "plug in", "connect the power", "power adapter"),
+        ),
+        (
+            "app",
+            "ثبّت أو افتح تطبيق الهاتف الذي يحدده دليل الشركة لهذا الموديل.",
+            ("download the app", "install the app", "open the app", "mobile app", "smartphone app"),
+        ),
+        (
+            "wifi",
+            "اربط المنتج بشبكة Wi‑Fi وفق متطلبات الشبكة المذكورة في الدليل.",
+            ("connect to wi-fi", "connect to wifi", "wi-fi network", "wifi network", "2.4 ghz"),
+        ),
+        (
+            "qr",
+            "استخدم رمز QR من التطبيق عندما يطلب دليل الشركة ذلك أثناء الإعداد.",
+            ("scan the qr", "scan qr", "qr code"),
+        ),
+        (
+            "pair",
+            "أكمل خطوة الاقتران أو إضافة الجهاز داخل التطبيق كما يوضح الدليل.",
+            ("pair the device", "pairing mode", "add device", "add the device"),
+        ),
+        (
+            "mount",
+            "ثبّت المنتج في المكان المناسب بالطريقة الموضحة في دليل التركيب.",
+            ("mount the", "mounting bracket", "install the camera", "install the device"),
+        ),
+        (
+            "storage",
+            "ركّب بطاقة الذاكرة بالطريقة والسعة المدعومتين في الدليل إذا كنت ستستخدم التخزين المحلي.",
+            ("insert microsd", "insert micro sd", "insert sd card", "tf card"),
+        ),
+        (
+            "reset",
+            "استخدم زر إعادة الضبط فقط بالطريقة والمدة المذكورتين في دليل الشركة.",
+            ("reset button", "press and hold reset", "factory reset"),
+        ),
+    )
+
+    for sentence in sentences:
+        lowered = sentence.lower()
+        for key, arabic, needles in patterns:
+            if key in seen:
+                continue
+            if any(needle in lowered for needle in needles):
+                seen.add(key)
+                evidence = sentence[:500]
+                found.append((key, arabic, evidence))
+                break
+    return found
+
+
 class ProductResearcher:
     """Research an exact product/model and keep source provenance for every extracted fact."""
 
@@ -196,7 +283,13 @@ class ProductResearcher:
                 )
 
         if not raw_results:
-            report = ProductResearchReport(exact, (), (), ("لم يتم العثور على مصادر بحث متاحة.",))
+            report = ProductResearchReport(
+                exact,
+                (),
+                (),
+                (),
+                ("لم يتم العثور على مصادر بحث متاحة.",),
+            )
             self.state.record_event(
                 "product_research.completed",
                 {"query": exact, "source_count": 0, "verified_fact_count": 0},
@@ -264,19 +357,65 @@ class ProductResearcher:
                 )
             )
 
+        grouped_steps: dict[str, dict[str, Any]] = {}
+        step_order = ("power", "app", "wifi", "qr", "pair", "mount", "storage", "reset")
+        for index, source_text in enumerate(source_texts):
+            for key, arabic, evidence in extract_setup_candidates(source_text):
+                bucket = grouped_steps.setdefault(
+                    key,
+                    {
+                        "key": key,
+                        "arabic": arabic,
+                        "evidence": evidence,
+                        "source_indexes": set(),
+                    },
+                )
+                bucket["source_indexes"].add(index)
+                if sources[index].likely_official:
+                    bucket["evidence"] = evidence
+
+        setup_steps: list[ResearchStep] = []
+        for key in step_order:
+            bucket = grouped_steps.get(key)
+            if not bucket:
+                continue
+            indexes = sorted(bucket["source_indexes"])
+            urls = tuple(sources[index].url for index in indexes)
+            verified = len(indexes) >= 2 or any(
+                sources[index].likely_official for index in indexes
+            )
+            setup_steps.append(
+                ResearchStep(
+                    key=key,
+                    arabic=bucket["arabic"],
+                    evidence=bucket["evidence"],
+                    source_urls=urls,
+                    verified=verified,
+                )
+            )
+
         warnings: list[str] = []
         if not any(source.likely_official for source in sources):
             warnings.append("لم أتعرف آليًا على مصدر يبدو رسميًا؛ لن تُستخدم الحقائق أحادية المصدر في التعليق.")
         if not any(fact.verified for fact in facts):
             warnings.append("لم توجد مواصفات وصلت إلى حد التحقق؛ سيبقى الإعلان معتمدًا على بيانات البائع والفيديو الحقيقي فقط.")
+        if not any(step.verified for step in setup_steps):
+            warnings.append("لم أجد خطوات تشغيل موثقة بما يكفي؛ لن يتم إنشاء شرح تشغيل تلقائي.")
 
-        report = ProductResearchReport(exact, tuple(sources), tuple(facts), tuple(warnings))
+        report = ProductResearchReport(
+            exact,
+            tuple(sources),
+            tuple(facts),
+            tuple(setup_steps),
+            tuple(warnings),
+        )
         self.state.record_event(
             "product_research.completed",
             {
                 "query": exact,
                 "source_count": len(sources),
                 "verified_fact_count": len(report.verified_facts),
+                "verified_setup_step_count": len(report.verified_setup_steps),
                 "warning_count": len(warnings),
             },
             agent="Product Research",
