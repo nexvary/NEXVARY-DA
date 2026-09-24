@@ -4,6 +4,7 @@ RequestExecutionLevel user
 !define APPNAME "NEXVARY Developer Agent"
 !define COMPANY "NEXVARY"
 !define EXE "NEXVARY-DA.exe"
+!define GUIEXE "NEXVARY-DA-GUI.exe"
 
 Name "${APPNAME}"
 OutFile "..\..\release-native\NEXVARY-DA-Setup.exe"
