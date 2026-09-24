@@ -421,18 +421,24 @@ class ProductAdWindow:
             self.status_var.set(f"راجع البيانات: {type(exc).__name__}: {exc}")
             return
 
+        selected_images = tuple(self.selected_images)
+        selected_videos = tuple(self.selected_videos)
+        research_enabled = bool(self.research_var.get())
+        voice_name = self.voice_var.get()
+        music_mode = self.music_var.get()
+
         def work():
             status = self.manager.status(VideoEngineId.MONEYPRINTER)
             if not status.ready:
                 self.manager.prepare(VideoEngineId.MONEYPRINTER)
 
-            imported = self.composer.import_selected_images(self.selected_images)
+            imported = self.composer.import_selected_images(selected_images)
             frames = self.composer.render_frames(imported, brief)
-            real_videos = self.composer.import_selected_videos(self.selected_videos)
+            real_videos = self.composer.import_selected_videos(selected_videos)
 
             report = None
             verified_facts: tuple[str, ...] = ()
-            if self.research_var.get():
+            if research_enabled:
                 report = self.runtime.product_research().research(
                     brief.product_name,
                     brief.model,
@@ -455,12 +461,12 @@ class ProductAdWindow:
                 aspect="9:16",
                 language="ar-EG",
                 video_source="local",
-                voice_name=self.voice_var.get(),
+                voice_name=voice_name,
                 video_materials=materials,
                 transition_mode="fade-in",
                 concat_mode="sequential",
                 clip_duration=8,
-                bgm_type=self.music_var.get(),
+                bgm_type=music_mode,
                 subtitle_enabled=True,
                 voice_rate=1.02,
             )
