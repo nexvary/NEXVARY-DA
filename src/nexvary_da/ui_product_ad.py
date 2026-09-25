@@ -587,8 +587,10 @@ class ProductAdWindow:
     def create_ad(self):
         try:
             brief = self._brief()
-            if not self.selected_images:
-                raise ValueError("أضف صورة واحدة على الأقل للمنتج")
+            if not brief.model and not brief.product_name:
+                raise ValueError("أدخل موديل المنتج أو اسمه")
+            if not self.selected_images and not self.selected_videos:
+                raise ValueError("أضف صورة للمنتج أو فيديو حقيقي واحد على الأقل")
             self.runtime.integration_settings().save(
                 {
                     "product_ad_currency": brief.currency,
@@ -618,15 +620,15 @@ class ProductAdWindow:
         video_audio = self.video_audio_var.get()
 
         def work():
-            status = self.manager.status(VideoEngineId.MONEYPRINTER)
-            if not status.ready:
-                self.manager.prepare(VideoEngineId.MONEYPRINTER)
+            real_video_sources = self.composer.import_selected_videos(selected_videos)
+            director = self.runtime.product_scene_director()
 
             imported = self.composer.import_selected_images(selected_images)
+            reference_from_video = False
+            if not imported and real_video_sources:
+                imported = [director.extract_reference_frame(real_video_sources[0])]
+                reference_from_video = True
             frames = self.composer.render_frames(imported, brief)
-            real_video_sources = self.composer.import_selected_videos(selected_videos)
-
-            director = self.runtime.product_scene_director()
             prepared_real_videos = director.prepare_real_videos(
                 real_video_sources,
                 role=video_role,
@@ -651,7 +653,7 @@ class ProductAdWindow:
                 except Exception as exc:
                     instruction_warning = f"{type(exc).__name__}: {exc}"
 
-            if auto_ocr_product_images:
+            if auto_ocr_product_images and selected_images:
                 try:
                     product_image_ocr_analyses = self.runtime.instruction_images().analyze(
                         selected_images
@@ -678,9 +680,13 @@ class ProductAdWindow:
                     try:
                         settings = self.runtime.integration_settings().load()
                         max_ai_scenes = max(1, min(8, int(settings.get("ai_max_scenes", "4") or "4")))
-                        vision_inputs = tuple(selected_instruction_images) + tuple(selected_images)
+                        vision_inputs = list(selected_instruction_images) + list(selected_images)
+                        if reference_from_video and imported:
+                            vision_inputs.append(str(imported[0]))
+                        if not vision_inputs:
+                            raise ValueError("No still image is available for CodeCraft vision analysis")
                         codecraft_plan = provider.analyze_product_images(
-                            vision_inputs,
+                            tuple(vision_inputs),
                             product_name=brief.product_name,
                             model_name=brief.model,
                             seller_details=brief.details,
@@ -718,11 +724,13 @@ class ProductAdWindow:
                     ai_scene_warning = f"{type(exc).__name__}: {exc}"
 
             ai_scene_materials = []
-            if ai_scene_assets:
+            if ai_scene_assets and imported:
                 ai_scene_materials = director.compose_ai_scene_assets(
                     [Path(item.output) for item in ai_scene_assets],
                     imported[0],
                 )
+            elif ai_scene_assets:
+                ai_scene_materials = [Path(item.output) for item in ai_scene_assets]
 
             fallback_scenes = instruction_scenes[len(ai_scene_assets):] if ai_scene_assets else instruction_scenes
             instruction_storyboard = director.render_instruction_storyboard(
@@ -762,24 +770,17 @@ class ProductAdWindow:
             if operation_explainer is not None:
                 ordered_materials.append(operation_explainer)
             ordered_materials.extend(research_cards)
-            materials = ",".join(str(path) for path in ordered_materials)
-            result = self.manager.create_moneyprinter(
-                subject=brief.product_name or brief.model,
+            native_render = self.runtime.direct_ad_renderer().render(
+                ordered_materials,
                 script=script.text,
-                duration_seconds=brief.target_seconds,
-                aspect="9:16",
-                language="ar-EG",
-                video_source="local",
                 voice_name=voice_name,
-                video_materials=materials,
-                transition_mode="fade-in",
-                concat_mode="sequential",
-                clip_duration=8,
-                bgm_type=music_mode,
-                subtitle_enabled=True,
-                voice_rate=1.02,
+                target_seconds=brief.target_seconds,
             )
+            result = native_render.to_dict()
+            result["engine"] = "nexvary-direct"
+            result["returncode"] = 0
             result["real_videos"] = len(prepared_real_videos)
+            result["reference_from_video"] = reference_from_video
             result["real_video_sources"] = len(real_video_sources)
             result["research_sources"] = len(report.sources) if report else 0
             result["verified_facts"] = len(verified_facts)
