@@ -42,8 +42,14 @@ class AutoProductAdHelperTests(unittest.TestCase):
     def test_purchase_fields_do_not_invent_missing_price_or_contact(self):
         info = extract_purchase_fields("الاستلام من الفرع فقط")
         self.assertEqual("", info["price"])
+        self.assertEqual("", info["currency"])
         self.assertEqual("", info["contact"])
         self.assertTrue(info["branches"])
+
+    def test_price_without_currency_keeps_currency_empty(self):
+        info = extract_purchase_fields("السعر: 3500")
+        self.assertEqual("3500", info["price"])
+        self.assertEqual("", info["currency"])
 
     def test_exact_model_match_ignores_punctuation_but_rejects_similar_model(self):
         self.assertTrue(_model_matches("Official manual for VTS30-G-F camera", "VTS30-G-F"))
