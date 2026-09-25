@@ -107,6 +107,14 @@ class DirectAdRenderer:
         if result.returncode != 0:
             raise RuntimeError(result.stdout[-8000:] or "FFmpeg render failed")
 
+    def _has_audio(self, source: Path) -> bool:
+        result = self.runner.run(
+            [self._ffmpeg_exe(), "-hide_banner", "-i", str(source)],
+            cwd=self.root,
+            timeout=45,
+        )
+        return "Audio:" in (result.stdout or "")
+
     def _segment(
         self,
         source: Path,
@@ -115,6 +123,12 @@ class DirectAdRenderer:
         seconds: float,
     ) -> None:
         ffmpeg = self._ffmpeg_exe()
+        video_args = [
+            "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+            "-r", "30", "-pix_fmt", "yuv420p",
+        ]
+        audio_args = ["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"]
+
         if source.suffix.lower() in _IMAGE_EXTS:
             frames = max(1, int(math.ceil(seconds * 30)))
             vf = (
@@ -126,11 +140,13 @@ class DirectAdRenderer:
             args = [
                 ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
                 "-loop", "1", "-i", str(source),
+                "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
                 "-t", f"{seconds:.3f}",
                 "-vf", vf,
-                "-an",
-                "-c:v", "libx264", "-preset", "medium", "-crf", "21",
-                "-r", "30", "-pix_fmt", "yuv420p", str(output),
+                "-map", "0:v:0", "-map", "1:a:0",
+                *video_args, *audio_args,
+                "-shortest",
+                str(output),
             ]
         else:
             vf = (
@@ -138,15 +154,26 @@ class DirectAdRenderer:
                 "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,"
                 "setsar=1,fps=30,format=yuv420p"
             )
+            has_audio = self._has_audio(source)
             args = [
                 ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
                 "-stream_loop", "-1", "-i", str(source),
-                "-t", f"{seconds:.3f}",
-                "-vf", vf,
-                "-an",
-                "-c:v", "libx264", "-preset", "medium", "-crf", "21",
-                "-r", "30", "-pix_fmt", "yuv420p", str(output),
             ]
+            if not has_audio:
+                args.extend(
+                    ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
+                )
+            args.extend(
+                [
+                    "-t", f"{seconds:.3f}",
+                    "-vf", vf,
+                    "-map", "0:v:0",
+                    "-map", "0:a:0" if has_audio else "1:a:0",
+                    *video_args, *audio_args,
+                    "-shortest",
+                    str(output),
+                ]
+            )
         self._run(args)
 
     async def _edge_save(self, text: str, voice: str, target: Path) -> None:
@@ -192,19 +219,20 @@ class DirectAdRenderer:
             segments.append(segment)
 
         ffmpeg = self._ffmpeg_exe()
-        silent = safe_job / "visual-track.mp4"
+        base_track = safe_job / "visual-track.mp4"
         args: list[str] = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
         for segment in segments:
             args.extend(["-i", str(segment)])
-        joined = "".join(f"[{index}:v]" for index in range(len(segments)))
+        joined = "".join(f"[{index}:v][{index}:a]" for index in range(len(segments)))
         args.extend(
             [
-                "-filter_complex", f"{joined}concat=n={len(segments)}:v=1:a=0[v]",
-                "-map", "[v]",
+                "-filter_complex", f"{joined}concat=n={len(segments)}:v=1:a=1[v][a]",
+                "-map", "[v]", "-map", "[a]",
                 "-t", str(target_seconds),
                 "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+                "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
                 "-r", "30", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                str(silent),
+                str(base_track),
             ]
         )
         self._run(args, timeout=1800)
@@ -230,15 +258,17 @@ class DirectAdRenderer:
             self._run(
                 [
                     ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-                    "-stream_loop", "-1", "-i", str(silent),
+                    "-stream_loop", "-1", "-i", str(base_track),
                     "-i", str(narration),
                     "-i", str(subtitle),
                     "-t", str(target_seconds),
-                    "-map", "0:v:0", "-map", "1:a:0", "-map", "2:0?",
+                    "-filter_complex",
+                    "[0:a:0][1:a:0]amix=inputs=2:duration=longest:dropout_transition=0,"
+                    f"atrim=0:{target_seconds},apad[a]",
+                    "-map", "0:v:0", "-map", "[a]", "-map", "2:0?",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
                     "-c:s", "mov_text",
                     "-metadata:s:s:0", "language=ara",
-                    "-af", "apad",
                     "-movflags", "+faststart",
                     str(output),
                 ],
@@ -248,11 +278,12 @@ class DirectAdRenderer:
             self._run(
                 [
                     ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", str(silent),
+                    "-i", str(base_track),
                     "-i", str(subtitle),
                     "-t", str(target_seconds),
-                    "-map", "0:v:0", "-map", "1:0?",
-                    "-c:v", "copy", "-c:s", "mov_text",
+                    "-map", "0:v:0", "-map", "0:a:0", "-map", "1:0?",
+                    "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+                    "-c:s", "mov_text",
                     "-metadata:s:s:0", "language=ara",
                     "-movflags", "+faststart",
                     str(output),
