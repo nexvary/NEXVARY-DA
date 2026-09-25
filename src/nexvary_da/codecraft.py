@@ -581,9 +581,9 @@ class CodeCraftProvider:
 
         currency = clean(parsed.get("currency"), 8).upper()
         if currency not in {"EGP", "AED", "SAR", "USD"}:
-            currency = str(fallback.get("currency") or "")
+            currency = str(fallback.get("currency") or "").upper()
         if currency not in {"EGP", "AED", "SAR", "USD"}:
-            currency = "EGP"
+            currency = ""
 
         contact = clean(parsed.get("contact"), 120) or str(fallback.get("contact") or "")
         branches = clean_list(parsed.get("branches"), 6) or tuple(fallback.get("branches") or ())
