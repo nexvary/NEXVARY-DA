@@ -44,10 +44,17 @@ def main() -> int:
                     "lavfi",
                     "-i",
                     "color=c=blue:s=640x480:d=4",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "sine=frequency=440:duration=4",
+                    "-shortest",
                     "-c:v",
                     "libx264",
                     "-pix_fmt",
                     "yuv420p",
+                    "-c:a",
+                    "aac",
                     str(source),
                 ],
                 stdout=subprocess.PIPE,
@@ -68,6 +75,28 @@ def main() -> int:
             )
             if not clips or not all(path.is_file() and path.stat().st_size > 0 for path in clips):
                 raise SystemExit(f"Scene Director did not render real-video clips: {clips}")
+
+            final_render = runtime.direct_ad_renderer().render(
+                [clips[0]],
+                script="",
+                voice_name="",
+                target_seconds=15,
+            )
+            final_path = Path(final_render.output)
+            if not final_path.is_file() or final_path.stat().st_size <= 0:
+                raise SystemExit("Direct renderer did not create a final Product Ad")
+
+            audio_probe = subprocess.run(
+                [str(media["ffmpeg"]), "-hide_banner", "-i", str(final_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                errors="replace",
+                timeout=60,
+                check=False,
+            )
+            if "Audio:" not in audio_probe.stdout:
+                raise SystemExit("Final Product Ad dropped the real sample audio stream")
 
             brief = ProductAdBrief(
                 product_name="Smoke Camera",
@@ -109,6 +138,7 @@ def main() -> int:
                 raise SystemExit("Scene Director AI product composite was not rendered")
 
             print(f"clips={len(clips)}")
+            print(f"direct_render={final_path}")
             print(f"explainer={explainer}")
             print(f"instruction_storyboard={storyboard}")
             print(f"ai_composite={composites[0]}")
