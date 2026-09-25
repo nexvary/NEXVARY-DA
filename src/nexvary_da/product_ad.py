@@ -404,6 +404,124 @@ class ProductAdComposer:
         return frames
 
 
+    def render_cta_card(
+        self,
+        brief: ProductAdBrief,
+        *,
+        size: tuple[int, int] = (1080, 1920),
+    ) -> Path:
+        """Render a branded final call-to-action card using seller-provided facts only."""
+        brief = brief.normalized()
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        job = self.root / ".nexvary-da" / "product-ads" / "cta" / uuid.uuid4().hex
+        safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
+        safe_job.mkdir(parents=True, exist_ok=True)
+
+        width, height = size
+        canvas = Image.new("RGB", size, "#07101A").convert("RGBA")
+        draw = ImageDraw.Draw(canvas)
+        draw.rounded_rectangle(
+            (70, 145, width - 70, height - 150),
+            radius=46,
+            fill="#0B1724",
+            outline="#D7E1EA",
+            width=5,
+        )
+        draw.rounded_rectangle(
+            (110, 1040, width - 110, 1325),
+            radius=34,
+            fill="#101F2D",
+            outline="#39FF88",
+            width=4,
+        )
+
+        _draw_text(
+            draw,
+            (width - 110, 300),
+            brief.product_name or "المنتج",
+            font=_font(62, bold=True),
+            fill="#18E7FF",
+            anchor="ra",
+        )
+        if brief.model:
+            _draw_text(
+                draw,
+                (width - 110, 390),
+                f"الموديل: {brief.model}",
+                font=_font(42, bold=True),
+                fill="#E4EDF5",
+                anchor="ra",
+            )
+
+        _draw_text(
+            draw,
+            (width - 140, 1145),
+            "سعر البيع",
+            font=_font(40, bold=True),
+            fill="#B8C4CE",
+            anchor="ra",
+        )
+        _draw_text(
+            draw,
+            (width - 140, 1245),
+            f"{brief.price} {_CURRENCY_AR[brief.currency]}",
+            font=_font(72, bold=True),
+            fill="#39FF88",
+            anchor="ra",
+        )
+
+        cta_text = "اطلب الآن"
+        if brief.contact:
+            _draw_text(
+                draw,
+                (width - 110, 1490),
+                cta_text,
+                font=_font(58, bold=True),
+                fill="#F4C84B",
+                anchor="ra",
+            )
+            _draw_text(
+                draw,
+                (width - 110, 1585),
+                brief.contact,
+                font=_font(54, bold=True),
+                fill="#F2F7FB",
+                anchor="ra",
+                rtl=False,
+            )
+        else:
+            _draw_text(
+                draw,
+                (width - 110, 1530),
+                brief.call_to_action or cta_text,
+                font=_font(52, bold=True),
+                fill="#F4C84B",
+                anchor="ra",
+            )
+
+        _draw_text(
+            draw,
+            (width - 110, height - 240),
+            "NEXVARY AI STUDIO",
+            font=_font(30, bold=True),
+            fill="#9EABB8",
+            anchor="ra",
+            rtl=False,
+        )
+
+        output = safe_job / "cta.png"
+        canvas.convert("RGB").save(output, format="PNG", quality=96)
+        self.state.record_event(
+            "product_ad.cta.rendered",
+            {
+                "output": str(output.relative_to(self.root)),
+                "model": brief.model,
+                "currency": brief.currency,
+            },
+            agent="Video Studio",
+        )
+        return output
+
     def import_selected_videos(self, selected: list[str] | tuple[str, ...]) -> list[Path]:
         """Copy seller-provided real product/demo videos into the approved workspace."""
         self.guard.require(self.root, Permission.WRITE, must_exist=True)
