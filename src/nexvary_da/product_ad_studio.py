@@ -395,6 +395,39 @@ class ProductAdStudioService:
                 "preview_render": bool(preview),
             }
         )
+
+        output = Path(str(result["output"]))
+        scene_manifest: list[dict[str, Any]] = []
+        for index, (scene, material) in enumerate(zip(scenes, materials), 1):
+            scene_manifest.append(
+                {
+                    "index": index,
+                    "scene": scene.to_dict(),
+                    "material_sha256": _sha256(material),
+                }
+            )
+
+        manifest = {
+            "schema": "nexvary.product-ad.render-manifest.v1",
+            "preview": bool(preview),
+            "engine": result["engine"],
+            "output": str(output),
+            "output_sha256": _sha256(output),
+            "storyboard_seconds": storyboard.total_seconds(),
+            "script": "" if preview else storyboard.script_text(),
+            "scenes": scene_manifest,
+        }
+        manifest_path = output.with_name(
+            "NEXVARY-Product-Ad-preview-manifest.json"
+            if preview
+            else "NEXVARY-Product-Ad-manifest.json"
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        result["manifest"] = str(manifest_path)
+        result["output_sha256"] = manifest["output_sha256"]
         return result
 
     def autosave(
