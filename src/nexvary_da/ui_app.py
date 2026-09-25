@@ -349,12 +349,8 @@ class DeveloperAgentUI:
                     self.append(f"[EASY TASK] {goal.strip()} • {summary}")
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.easy_panel.set_message(
-                        f"Could not create the plan: {type(exc).__name__}: {exc}"
-                    ),
-                )
+                message = f"Could not create the plan: {type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                self.window.after(0, lambda value=message: self.easy_panel.set_message(value))
         threading.Thread(target=worker, daemon=True).start()
 
     def _build_projects(self, parent) -> None:
@@ -482,15 +478,14 @@ class DeveloperAgentUI:
                         self.easy_panel.refresh()
                 self.window.after(0,done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: (
-                        self.append(f"VERIFICATION ERROR • {type(exc).__name__}: {exc}"),
-                        self.set_status("ready","READY NO","BLOCKED"),
-                        self.run_button.configure(state="normal"),
-                        self.easy_panel.set_message(f"Check failed: {type(exc).__name__}: {exc}") if hasattr(self, "easy_panel") else None,
-                    ),
-                )
+                message = f"{type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                def failed(value=message):
+                    self.append(f"VERIFICATION ERROR • {value}")
+                    self.set_status("ready","READY NO","BLOCKED")
+                    self.run_button.configure(state="normal")
+                    if hasattr(self, "easy_panel"):
+                        self.easy_panel.set_message(f"Check failed: {value}")
+                self.window.after(0, failed)
         threading.Thread(target=worker,daemon=True).start()
 
     def plan_task(self)->None:
@@ -526,8 +521,9 @@ class DeveloperAgentUI:
                             self.zcode_status_label.configure(fg=PALETTE.danger)
                 self.window.after(0, done)
             except Exception as exc:
-                def failed():
-                    self.append(f"ENGINE PLAN ERROR • {type(exc).__name__}: {exc}")
+                message = f"{type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                def failed(value=message):
+                    self.append(f"ENGINE PLAN ERROR • {value}")
                     if engine in {AgentEngine.ZCODE, AgentEngine.HYBRID}:
                         self.zcode_status_var.set("ZCODE BLOCKED")
                         self.zcode_status_label.configure(fg=PALETTE.danger)
