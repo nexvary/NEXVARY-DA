@@ -86,7 +86,14 @@ def _brand_token(product_name: str) -> str:
     return ""
 
 
-def _likely_official(url: str, title: str, product_name: str) -> bool:
+def _model_matches(text: str, model: str) -> bool:
+    needle = _compact(model)
+    if not needle:
+        return True
+    return needle in _compact(text)
+
+
+def _likely_official(url: str, title: str, product_name: str, model: str = "") -> bool:
     host = (urlparse(url).hostname or "").lower()
     if not host or any(marker in host for marker in _MARKETPLACE_HOSTS):
         return False
@@ -94,7 +101,14 @@ def _likely_official(url: str, title: str, product_name: str) -> bool:
     if brand and brand in _compact(host):
         return True
     lowered = title.lower()
-    return bool(brand and brand in lowered and any(word in lowered for word in ("official", "support", "manual")))
+    if brand and brand in lowered and any(word in lowered for word in ("official", "support", "manual")):
+        return True
+    return bool(
+        not brand
+        and model
+        and _model_matches(title, model)
+        and any(word in lowered for word in ("official", "support", "manufacturer"))
+    )
 
 
 def extract_fact_candidates(text: str) -> list[tuple[str, str, str]]:
@@ -256,10 +270,23 @@ class ProductResearcher:
             raise RuntimeError("Product research requires the trafilatura package") from exc
 
         exact = " ".join(part for part in (product_name, model) if part).strip()
-        queries = [
-            f'"{exact}" official specifications',
-            f'"{exact}" manual setup installation',
-        ]
+        queries: list[str] = []
+        if model:
+            queries.extend(
+                [
+                    f'"{model}" official specifications manufacturer',
+                    f'"{model}" official support manual',
+                ]
+            )
+        if product_name and model:
+            queries.append(f'"{product_name}" "{model}" official')
+        elif product_name:
+            queries.extend(
+                [
+                    f'"{product_name}" official specifications',
+                    f'"{product_name}" official support manual',
+                ]
+            )
 
         raw_results: list[dict[str, str]] = []
         seen_urls: set[str] = set()
@@ -300,7 +327,7 @@ class ProductResearcher:
         def score(item: dict[str, str]) -> tuple[int, int]:
             hay = _compact(item["title"] + " " + item["snippet"])
             model_hit = 1 if model and _compact(model) in hay else 0
-            official = 1 if _likely_official(item["url"], item["title"], product_name) else 0
+            official = 1 if _likely_official(item["url"], item["title"], product_name, model) else 0
             return (official, model_hit)
 
         raw_results.sort(key=score, reverse=True)
@@ -321,16 +348,38 @@ class ProductResearcher:
             except Exception:
                 extracted = ""
             source_text = " ".join(part for part in (item["title"], item["snippet"], extracted) if part)
+            if model and not _model_matches(source_text, model):
+                continue
             sources.append(
                 ResearchSource(
                     title=item["title"],
                     url=item["url"],
                     snippet=item["snippet"],
-                    likely_official=_likely_official(item["url"], item["title"], product_name),
+                    likely_official=_likely_official(item["url"], item["title"], product_name, model),
                     extracted_chars=len(extracted),
                 )
             )
             source_texts.append(source_text)
+
+        if not sources:
+            report = ProductResearchReport(
+                exact,
+                (),
+                (),
+                (),
+                ("تم تجاهل نتائج البحث لأنها لا تحتوي الموديل الدقيق المطلوب؛ لن يتم استخدام مواصفات من موديل مشابه.",),
+            )
+            self.state.record_event(
+                "product_research.completed",
+                {
+                    "query": exact,
+                    "source_count": 0,
+                    "verified_fact_count": 0,
+                    "exact_model_required": bool(model),
+                },
+                agent="Product Research",
+            )
+            return report
 
         grouped: dict[tuple[str, str], dict[str, Any]] = {}
         for index, source_text in enumerate(source_texts):
