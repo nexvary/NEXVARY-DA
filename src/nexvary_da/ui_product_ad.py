@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import threading
+import traceback
 import webbrowser
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .codecraft import extract_purchase_fields
@@ -77,6 +79,35 @@ class ProductAdWindow:
 
     def px(self, value: int) -> int:
         return max(1, int(round(value * self.scale)))
+
+    def _capture_failure(self, prefix: str, exc: BaseException) -> str:
+        """Capture the real worker exception before Python clears the except variable."""
+        detail = str(exc).strip() or "<no exception message>"
+        message = f"{prefix}: {type(exc).__name__}: {detail}"
+        try:
+            folder = self.runtime.root / ".nexvary-da" / "product-ads" / "errors"
+            folder.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            target = folder / f"product-ad-{stamp}.log"
+            target.write_text(
+                message + "\n\n" + traceback.format_exc(),
+                encoding="utf-8",
+            )
+            self._last_error_log = str(target)
+            try:
+                self.runtime.state.record_event(
+                    "product_ad.ui.failure",
+                    {"message": message, "log": str(target)},
+                    agent="Product Ad UI",
+                )
+            except Exception:
+                pass
+            return message + f" • سجل الخطأ: {target.name}"
+        except Exception:
+            return message
+
+    def _post_status(self, message: str) -> None:
+        self.window.after(0, lambda value=message: self.status_var.set(value))
 
     def label(self, parent, text: str, *, size=9, fg=None, bold=False, rtl=True):
         return self.tk.Label(
@@ -511,12 +542,7 @@ class ProductAdWindow:
                     )
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.status_var.set(
-                        f"تعذر تحليل صور التعليمات: {type(exc).__name__}: {exc}"
-                    ),
-                )
+                self._post_status(self._capture_failure("تعذر تحليل صور التعليمات", exc))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -582,10 +608,7 @@ class ProductAdWindow:
                         self.status_var.set("انتهى المحرك بخطأ. افتح Advanced Mode لعرض التفاصيل.")
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.status_var.set(f"فشل إنشاء الإعلان: {type(exc).__name__}: {exc}"),
-                )
+                self._post_status(self._capture_failure("فشل إنشاء الإعلان", exc))
         threading.Thread(target=worker, daemon=True).start()
 
     def create_ad(self):
@@ -1733,10 +1756,7 @@ class AutoProductAdWindow(ProductAdWindow):
                     )
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.status_var.set(f"تعذر بناء الـStoryboard: {type(exc).__name__}: {exc}"),
-                )
+                self._post_status(self._capture_failure("تعذر بناء الـStoryboard", exc))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -1779,10 +1799,7 @@ class AutoProductAdWindow(ProductAdWindow):
                         )
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.status_var.set(f"فشل الرندر: {type(exc).__name__}: {exc}"),
-                )
+                self._post_status(self._capture_failure("فشل الرندر", exc))
 
         threading.Thread(target=run, daemon=True).start()
 
