@@ -58,28 +58,38 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y xvfb
 
-      - name: Runtime UI probe with screenshot
+      - name: Runtime UI probes with screenshots
         if: runner.os == 'Linux'
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" python tests/ui_probe_smoke.py --screenshot-output ui-probe.png --require-screenshot
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1080x24" python tests/ui_probe_smoke.py --width 1366 --height 768 --screenshot-output ui-probe-1366x768.png --require-screenshot
+          xvfb-run -a -s "-screen 0 2800x1600x24" python tests/ui_probe_smoke.py --width 2560 --height 1440 --screenshot-output ui-probe-2560x1440.png --require-screenshot
 
-      - name: Navigation Integrity Probe
+      - name: Navigation Integrity Probes
         if: runner.os == 'Linux'
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" python tests/navigation_probe_smoke.py
+        run: |
+          xvfb-run -a -s "-screen 0 1920x1080x24" python tests/navigation_probe_smoke.py --width 1366 --height 768
+          xvfb-run -a -s "-screen 0 2800x1600x24" python tests/navigation_probe_smoke.py --width 2560 --height 1440
 
-      - name: Runtime UI probe
+      - name: Runtime UI probes
         if: runner.os == 'Windows'
-        run: python tests/ui_probe_smoke.py
+        run: |
+          python tests/ui_probe_smoke.py --width 1366 --height 768
+          python tests/ui_probe_smoke.py --width 2560 --height 1440
 
-      - name: Navigation Integrity Probe
+      - name: Navigation Integrity Probes
         if: runner.os == 'Windows'
-        run: python tests/navigation_probe_smoke.py
+        run: |
+          python tests/navigation_probe_smoke.py --width 1366 --height 768
+          python tests/navigation_probe_smoke.py --width 2560 --height 1440
 
-      - name: Upload UI probe screenshot
+      - name: Upload UI probe screenshots
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v6
         with:
           name: nexvary-da-ui-probe-${{ runner.os }}
-          path: ui-probe.png
+          path: |
+            ui-probe-1366x768.png
+            ui-probe-2560x1440.png
           if-no-files-found: error
           retention-days: 14
 
