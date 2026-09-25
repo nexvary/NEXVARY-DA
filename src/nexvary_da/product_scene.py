@@ -272,6 +272,50 @@ class ProductSceneDirector:
         if result.returncode != 0:
             raise RuntimeError(result.stdout[-6000:] or f"Could not prepare {source.name}")
 
+    def extract_reference_frame(self, video: Path) -> Path:
+        """Extract a clean reference still from seller-provided real video for AUTO AD mode."""
+        self.guard.require(self.root, Permission.SHELL, must_exist=True)
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        source = self.guard.require(video, Permission.READ, must_exist=True)
+        duration = self._duration(source)
+        timestamp = max(0.0, min(max(0.0, duration - 0.5), duration * 0.18))
+        job = self.root / ".nexvary-da" / "product-ads" / "video-reference" / uuid.uuid4().hex
+        safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
+        safe_job.mkdir(parents=True, exist_ok=True)
+        output = safe_job / "reference-frame.png"
+        result = self.runner.run(
+            [
+                self._ffmpeg_exe(),
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-ss",
+                f"{timestamp:.3f}",
+                "-i",
+                str(source),
+                "-frames:v",
+                "1",
+                "-vf",
+                "scale=1280:-2:force_original_aspect_ratio=decrease",
+                str(output),
+            ],
+            cwd=self.root,
+            timeout=180,
+        )
+        if result.returncode != 0 or not output.is_file():
+            raise RuntimeError(result.stdout[-6000:] or "Could not extract product reference frame")
+        self.state.record_event(
+            "product_ad.reference_frame.extracted",
+            {
+                "source": str(source),
+                "timestamp_seconds": round(timestamp, 3),
+                "output": str(output.relative_to(self.root)),
+            },
+            agent="Scene Director",
+        )
+        return output
+
     def prepare_real_videos(
         self,
         videos: list[Path] | tuple[Path, ...],
