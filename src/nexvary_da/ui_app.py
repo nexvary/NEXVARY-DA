@@ -23,7 +23,7 @@ from .ui_theme import PALETTE, scale_for_screen, section_color, status_color
 
 
 class DeveloperAgentUI:
-    def __init__(self, window, root: str | Path):
+    def __init__(self, window, root: str | Path, *, ui_scale: float | None = None):
         import tkinter as tk
         self.tk, self.window = tk, window
         self.runtime = ProjectRuntime(root)
@@ -36,7 +36,11 @@ class DeveloperAgentUI:
         self._embedded_page = None
         self._current_page = "home"
         self.terminal = self.runtime.terminal_for("ui")
-        self.scale = scale_for_screen(window.winfo_screenwidth(), window.winfo_screenheight())
+        self.scale = (
+            max(0.75, min(1.5, float(ui_scale)))
+            if ui_scale is not None
+            else scale_for_screen(window.winfo_screenwidth(), window.winfo_screenheight())
+        )
         self.font = "Segoe UI" if window.tk.call("tk", "windowingsystem") == "win32" else "TkDefaultFont"
         self.mono = "Cascadia Mono" if window.tk.call("tk", "windowingsystem") == "win32" else "TkFixedFont"
         self.repo = self.runtime.config.repository or "local-only"
