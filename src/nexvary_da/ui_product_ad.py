@@ -647,21 +647,41 @@ class ProductAdWindow:
         video_audio = self.video_audio_var.get()
 
         def work():
+            pipeline_warnings: list[str] = []
             real_video_sources = self.composer.import_selected_videos(selected_videos)
             director = self.runtime.product_scene_director()
 
             imported = self.composer.import_selected_images(selected_images)
             reference_from_video = False
             if not imported and real_video_sources:
-                imported = [director.extract_reference_frame(real_video_sources[0])]
-                reference_from_video = True
-            frames = self.composer.render_frames(imported, brief)
-            prepared_real_videos = director.prepare_real_videos(
-                real_video_sources,
-                role=video_role,
-                audio_policy=video_audio,
-                clip_seconds=8.0,
-            )
+                try:
+                    imported = [director.extract_reference_frame(real_video_sources[0])]
+                    reference_from_video = True
+                except Exception as exc:
+                    pipeline_warnings.append(
+                        f"reference frame skipped: {type(exc).__name__}: {exc}"
+                    )
+
+            try:
+                frames = self.composer.render_frames(imported, brief)
+            except Exception as exc:
+                frames = list(imported)
+                pipeline_warnings.append(
+                    f"styled product frames skipped; raw images used: {type(exc).__name__}: {exc}"
+                )
+
+            try:
+                prepared_real_videos = director.prepare_real_videos(
+                    real_video_sources,
+                    role=video_role,
+                    audio_policy=video_audio,
+                    clip_seconds=8.0,
+                )
+            except Exception as exc:
+                prepared_real_videos = list(real_video_sources)
+                pipeline_warnings.append(
+                    f"real-video preparation skipped; original video used: {type(exc).__name__}: {exc}"
+                )
 
             instruction_analyses = ()
             product_image_ocr_analyses = ()
@@ -751,36 +771,66 @@ class ProductAdWindow:
                     ai_scene_warning = f"{type(exc).__name__}: {exc}"
 
             ai_scene_materials = []
-            if ai_scene_assets and imported:
-                ai_scene_materials = director.compose_ai_scene_assets(
-                    [Path(item.output) for item in ai_scene_assets],
-                    imported[0],
+            try:
+                if ai_scene_assets and imported:
+                    ai_scene_materials = director.compose_ai_scene_assets(
+                        [Path(item.output) for item in ai_scene_assets],
+                        imported[0],
+                    )
+                elif ai_scene_assets:
+                    ai_scene_materials = [Path(item.output) for item in ai_scene_assets]
+            except Exception as exc:
+                ai_scene_materials = []
+                pipeline_warnings.append(
+                    f"AI supporting visuals skipped: {type(exc).__name__}: {exc}"
                 )
-            elif ai_scene_assets:
-                ai_scene_materials = [Path(item.output) for item in ai_scene_assets]
 
             fallback_scenes = instruction_scenes[len(ai_scene_assets):] if ai_scene_assets else instruction_scenes
-            instruction_storyboard = director.render_instruction_storyboard(
-                brief,
-                fallback_scenes,
-            )
+            instruction_storyboard = None
+            try:
+                instruction_storyboard = director.render_instruction_storyboard(
+                    brief,
+                    fallback_scenes,
+                )
+            except Exception as exc:
+                pipeline_warnings.append(
+                    f"instruction storyboard skipped: {type(exc).__name__}: {exc}"
+                )
 
             report = None
             verified_facts: tuple[str, ...] = ()
             verified_steps: tuple[str, ...] = ()
             if research_enabled:
-                report = self.runtime.product_research().research(
-                    brief.product_name,
-                    brief.model,
-                )
-                verified_facts = tuple(item.arabic for item in report.verified_facts)
-                verified_steps = tuple(item.arabic for item in report.verified_setup_steps)
+                try:
+                    report = self.runtime.product_research().research(
+                        brief.product_name,
+                        brief.model,
+                    )
+                    verified_facts = tuple(item.arabic for item in report.verified_facts)
+                    verified_steps = tuple(item.arabic for item in report.verified_setup_steps)
+                except Exception as exc:
+                    pipeline_warnings.append(
+                        f"research skipped: {type(exc).__name__}: {exc}"
+                    )
 
-            research_cards = self.composer.render_research_cards(brief, verified_facts)
-            operation_explainer = director.render_operation_explainer(
-                brief,
-                verified_steps,
-            )
+            research_cards = []
+            try:
+                research_cards = self.composer.render_research_cards(brief, verified_facts)
+            except Exception as exc:
+                pipeline_warnings.append(
+                    f"research cards skipped: {type(exc).__name__}: {exc}"
+                )
+
+            operation_explainer = None
+            try:
+                operation_explainer = director.render_operation_explainer(
+                    brief,
+                    verified_steps,
+                )
+            except Exception as exc:
+                pipeline_warnings.append(
+                    f"operation explainer skipped: {type(exc).__name__}: {exc}"
+                )
             script = build_arabic_product_script(
                 brief,
                 real_video_count=len(prepared_real_videos),
@@ -797,12 +847,46 @@ class ProductAdWindow:
             if operation_explainer is not None:
                 ordered_materials.append(operation_explainer)
             ordered_materials.extend(research_cards)
-            native_render = self.runtime.direct_ad_renderer().render(
-                ordered_materials,
-                script=script.text,
-                voice_name=voice_name,
-                target_seconds=brief.target_seconds,
-            )
+
+            renderer = self.runtime.direct_ad_renderer()
+            attempts = [
+                ("full", ordered_materials),
+                ("base", [*frames, *prepared_real_videos]),
+                ("images-only", list(frames) or list(imported)),
+                ("raw-images", list(imported)),
+                ("real-video-only", list(prepared_real_videos) or list(real_video_sources)),
+                ("raw-real-video", list(real_video_sources)),
+            ]
+            native_render = None
+            render_mode = ""
+            render_errors: list[str] = []
+            seen: set[tuple[str, ...]] = set()
+            for mode, materials in attempts:
+                usable = [Path(item) for item in materials if Path(item).is_file()]
+                signature = tuple(str(item) for item in usable)
+                if not usable or signature in seen:
+                    continue
+                seen.add(signature)
+                try:
+                    native_render = renderer.render(
+                        usable,
+                        script=script.text,
+                        voice_name=voice_name,
+                        target_seconds=brief.target_seconds,
+                    )
+                    render_mode = mode
+                    break
+                except Exception as exc:
+                    render_errors.append(f"{mode}: {type(exc).__name__}: {exc}")
+
+            if native_render is None:
+                raise RuntimeError(
+                    "جميع محاولات الرندر فشلت. " + " | ".join(render_errors[-6:])
+                )
+            if render_mode != "full":
+                pipeline_warnings.append(
+                    f"تم إنقاذ الإعلان بمسار {render_mode} بعد فشل المسار الكامل"
+                )
             result = native_render.to_dict()
             result["engine"] = "nexvary-direct"
             result["returncode"] = 0
@@ -825,6 +909,9 @@ class ProductAdWindow:
             result["codecraft_model"] = codecraft_plan.model_id if codecraft_plan else ""
             result["codecraft_scenes"] = len(codecraft_plan.scenes) if codecraft_plan else 0
             result["codecraft_warning"] = codecraft_warning
+            result["render_mode"] = render_mode
+            result["render_errors"] = tuple(render_errors)
+            result["pipeline_warnings"] = tuple(pipeline_warnings)
             return result
 
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
