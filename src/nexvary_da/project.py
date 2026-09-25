@@ -14,6 +14,7 @@ from .codecraft import CodeCraftProvider
 from .android_profile import AndroidTools
 from .android_ui import AndroidUIHarness
 from .cua_adapter import CuaDriverAdapter
+from .direct_ad_renderer import DirectAdRenderer
 from .fastmcp_gateway import FastMCPGateway
 from .media_adapters import MoneyPrinterTurboAdapter, QwenImageAdapter, VoiceStudioAdapter
 from .oya_adapter import OyaBrowserAdapter
@@ -234,6 +235,14 @@ class ProjectRuntime:
 
     def product_scene_director(self) -> ProductSceneDirector:
         return ProductSceneDirector(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+        )
+
+    def direct_ad_renderer(self) -> DirectAdRenderer:
+        return DirectAdRenderer(
             self.guard,
             self.runner,
             self.state,
