@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
+from .codecraft import extract_purchase_fields
 from .product_ad import ProductAdBrief, build_arabic_product_script
 from .product_scene import RealVideoAudioPolicy, RealVideoRole
 from .ui_theme import PALETTE
@@ -10,7 +11,7 @@ from .video_studio import VideoEngineId
 
 
 class ProductAdWindow:
-    """Arabic-first product advertisement workflow backed by MoneyPrinterTurbo."""
+    """Advanced Arabic-first product advertisement workflow using NEXVARY Direct Renderer."""
 
     def __init__(self, parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None):
         import tkinter as tk
@@ -803,8 +804,428 @@ class ProductAdWindow:
         self._background("يتم تجهيز الصور والفيديو الحقيقي والبحث وإنشاء الإعلان", work)
 
 
+class AutoProductAdWindow(ProductAdWindow):
+    """Simple AUTO PRODUCT AD front-end with an optional in-window Advanced mode."""
+
+    def _build(self):
+        self.advanced_mode = False
+        self.details_box = None
+        if not hasattr(self, "_auto_details_text"):
+            self._auto_details_text = ""
+        if not hasattr(self, "_auto_preview_signature"):
+            self._auto_preview_signature = None
+        self._build_auto()
+
+    def _build_auto(self):
+        tk = self.tk
+        header = tk.Frame(
+            self.window,
+            bg=PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        header.pack(fill="x")
+        tk.Frame(header, bg=PALETTE.magenta, height=self.px(3)).pack(fill="x")
+        self.label(
+            header,
+            "AUTO PRODUCT AD",
+            size=18,
+            fg=PALETTE.magenta,
+            bold=True,
+            rtl=False,
+        ).pack(fill="x", padx=self.px(18), pady=(self.px(12), 0))
+        self.label(
+            header,
+            "موديل + فيديو حقيقي + صورة تعليمات شراء → بحث موثق + OCR + CodeCraft → إعلان كامل",
+            size=8,
+            fg=PALETTE.muted,
+        ).pack(fill="x", padx=self.px(18), pady=(0, self.px(12)))
+
+        body = tk.Frame(self.window, bg=PALETTE.background)
+        body.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(10))
+
+        card = tk.Frame(
+            body,
+            bg=PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        card.pack(side="right", fill="both", expand=True, padx=(self.px(5), 0))
+        preview = tk.Frame(
+            body,
+            bg=PALETTE.surface,
+            highlightbackground=PALETTE.silver,
+            highlightthickness=1,
+        )
+        preview.pack(side="left", fill="both", expand=True, padx=(0, self.px(5)))
+
+        form = tk.Frame(card, bg=PALETTE.surface)
+        form.pack(fill="both", expand=True, padx=self.px(16), pady=self.px(14))
+
+        self._entry(form, self.model_var, "Model / موديل المنتج", PALETTE.purple)
+
+        videos = tk.Frame(form, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
+        videos.pack(fill="x", pady=(self.px(12), 0))
+        self.label(videos, "Real Product / Camera Sample", size=8, fg=PALETTE.orange, bold=True, rtl=False).pack(
+            side="right", padx=self.px(8), pady=self.px(8)
+        )
+        tk.Label(
+            videos,
+            textvariable=self.videos_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.muted,
+            anchor="e",
+            justify="right",
+            font=(self.font, self.px(7)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
+        self.button(videos, "ADD VIDEO", self.choose_videos, accent=True).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+        self.button(videos, "مسح", self.clear_videos).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+
+        instructions = tk.Frame(form, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
+        instructions.pack(fill="x", pady=(self.px(8), 0))
+        self.label(instructions, "Purchase Instructions / تعليمات الشراء", size=8, fg=PALETTE.gold, bold=True, rtl=False).pack(
+            side="right", padx=self.px(8), pady=self.px(8)
+        )
+        tk.Label(
+            instructions,
+            textvariable=self.instruction_images_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.muted,
+            anchor="e",
+            justify="right",
+            font=(self.font, self.px(7)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
+        self.button(instructions, "ADD IMAGE", self.choose_instruction_images, accent=True).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+        self.button(instructions, "مسح", self.clear_instruction_images).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+
+        photos = tk.Frame(form, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
+        photos.pack(fill="x", pady=(self.px(8), 0))
+        self.label(photos, "Optional Product Images / صور اختيارية", size=8, fg=PALETTE.cyan, bold=True, rtl=False).pack(
+            side="right", padx=self.px(8), pady=self.px(8)
+        )
+        tk.Label(
+            photos,
+            textvariable=self.images_var,
+            bg=PALETTE.surface_alt,
+            fg=PALETTE.muted,
+            anchor="e",
+            justify="right",
+            font=(self.font, self.px(7)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
+        self.button(photos, "ADD", self.choose_images, accent=True).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+        self.button(photos, "مسح", self.clear_images).pack(
+            side="left", padx=self.px(5), pady=self.px(5)
+        )
+
+        choices = tk.Frame(form, bg=PALETTE.surface)
+        choices.pack(fill="x", pady=(self.px(10), 0))
+        duration_side = tk.Frame(choices, bg=PALETTE.surface)
+        voice_side = tk.Frame(choices, bg=PALETTE.surface)
+        duration_side.pack(side="right", fill="x", expand=True, padx=(self.px(5), 0))
+        voice_side.pack(side="left", fill="x", expand=True, padx=(0, self.px(5)))
+        self._choice(
+            duration_side,
+            "Duration / المدة",
+            self.duration_var,
+            (("30", "30"), ("45", "45"), ("60", "60")),
+            PALETTE.orange,
+        )
+        self._choice(
+            voice_side,
+            "Voice / الصوت",
+            self.voice_var,
+            (("Arabic Female", "ar-EG-SalmaNeural"), ("Arabic Male", "ar-EG-ShakirNeural")),
+            PALETTE.cyan,
+        )
+
+        self.label(
+            form,
+            "لن يطلب AUTO السعر أو الهاتف أو الفروع إذا كانت ظاهرة بوضوح في صورة تعليمات الشراء؛ سيتم استخراجها وعرضها في المعاينة أولًا.",
+            size=8,
+            fg=PALETTE.action,
+            bold=True,
+        ).pack(fill="x", pady=(self.px(14), self.px(8)))
+
+        self.button(form, "تحليل ومعاينة / AUTO PREVIEW", self.preview_script).pack(
+            fill="x", pady=(self.px(6), self.px(4))
+        )
+        self.auto_create_button = self.button(
+            form,
+            "CREATE COMPLETE AD AUTOMATICALLY",
+            self.create_ad,
+            accent=True,
+        )
+        self.auto_create_button.configure(state="disabled")
+        self.auto_create_button.pack(fill="x", pady=self.px(4))
+        self.button(form, "Advanced / متقدم", self._show_advanced).pack(
+            fill="x", pady=(self.px(8), self.px(4))
+        )
+
+        preview_inner = tk.Frame(preview, bg=PALETTE.surface)
+        preview_inner.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(12))
+        self.label(preview_inner, "Preview / المعاينة قبل الرندر", size=10, fg=PALETTE.magenta, bold=True).pack(fill="x")
+        self.script_preview = tk.Text(
+            preview_inner,
+            width=48,
+            height=24,
+            wrap="word",
+            bg=PALETTE.terminal,
+            fg=PALETTE.text,
+            insertbackground=PALETTE.action,
+            relief="flat",
+            bd=0,
+            state="disabled",
+            font=(self.font, self.px(8)),
+        )
+        self.script_preview.pack(fill="both", expand=True, pady=(self.px(8), 0))
+
+        footer = tk.Frame(self.window, bg=PALETTE.surface)
+        footer.pack(fill="x")
+        tk.Label(
+            footer,
+            textvariable=self.status_var,
+            bg=PALETTE.surface,
+            fg=PALETTE.cyan,
+            anchor="e",
+            justify="right",
+            wraplength=self.px(960),
+            font=(self.font, self.px(8)),
+        ).pack(side="right", fill="x", expand=True, padx=self.px(14), pady=self.px(9))
+        self.button(footer, "رجوع", self.close, accent=True).pack(
+            side="left", padx=self.px(10), pady=self.px(7)
+        )
+        self.status_var.set("أدخل الموديل وأضف فيديو حقيقي وصورة تعليمات الشراء، ثم اضغط AUTO PREVIEW.")
+
+    def _show_advanced(self):
+        for child in tuple(self.window.winfo_children()):
+            child.destroy()
+        self.advanced_mode = True
+        ProductAdWindow._build(self)
+        if self.details_box is not None and self._auto_details_text:
+            self.details_box.delete("1.0", "end")
+            self.details_box.insert("1.0", self._auto_details_text)
+        self.status_var.set("Advanced Mode — جميع الحقول الإضافية اختيارية للتحكم اليدوي.")
+
+    def close(self):
+        if getattr(self, "advanced_mode", False):
+            for child in tuple(self.window.winfo_children()):
+                child.destroy()
+            self.advanced_mode = False
+            self.details_box = None
+            self._build_auto()
+            return
+        if callable(self.on_back):
+            self.on_back()
+            return
+        self.window.destroy()
+
+    def _auto_signature(self):
+        return (
+            self.model_var.get().strip(),
+            tuple(self.selected_videos),
+            tuple(self.selected_instruction_images),
+            tuple(self.selected_images),
+            self.duration_var.get(),
+            self.voice_var.get(),
+        )
+
+    def _brief(self) -> ProductAdBrief:
+        if getattr(self, "advanced_mode", False):
+            return ProductAdWindow._brief(self)
+        return ProductAdBrief(
+            product_name=self.product_name_var.get(),
+            model=self.model_var.get(),
+            price=self.price_var.get(),
+            currency=self.currency_var.get() or "EGP",
+            details=self._auto_details_text,
+            contact=self.contact_var.get(),
+            target_seconds=int(self.duration_var.get()),
+        ).normalized()
+
+    def preview_script(self):
+        if getattr(self, "advanced_mode", False):
+            return ProductAdWindow.preview_script(self)
+
+        model = self.model_var.get().strip()
+        if not model:
+            self.status_var.set("أدخل موديل المنتج أولًا.")
+            return
+        if not self.selected_videos:
+            self.status_var.set("أضف فيديو حقيقي واحدًا على الأقل للمنتج أو الكاميرا.")
+            return
+        if not self.selected_instruction_images:
+            self.status_var.set("أضف صورة تعليمات الشراء لاستخراج السعر والتواصل والفروع.")
+            return
+
+        selected_instruction_images = tuple(self.selected_instruction_images)
+        signature = self._auto_signature()
+        if hasattr(self, "auto_create_button"):
+            self.auto_create_button.configure(state="disabled")
+        self._auto_preview_signature = None
+        self.status_var.set("AUTO: OCR + CodeCraft + بحث موثق عن الموديل الدقيق…")
+
+        def worker():
+            analyses = ()
+            ocr_warning = ""
+            try:
+                analyses = self.runtime.instruction_images().analyze(selected_instruction_images)
+            except Exception as exc:
+                ocr_warning = f"{type(exc).__name__}: {exc}"
+
+            ocr_texts = tuple(item.text for item in analyses)
+            fallback = extract_purchase_fields("\n".join(ocr_texts))
+            purchase = None
+            codecraft_warning = ""
+            provider = self.runtime.codecraft()
+            if provider.has_api_key():
+                try:
+                    settings = self.runtime.integration_settings().load()
+                    purchase = provider.analyze_purchase_instructions(
+                        selected_instruction_images,
+                        ocr_texts=ocr_texts,
+                        model_name=model,
+                        preferred_model=settings.get("codecraft_model", ""),
+                    )
+                except Exception as exc:
+                    codecraft_warning = f"{type(exc).__name__}: {exc}"
+
+            product_name = purchase.product_name if purchase else ""
+            price = purchase.price if purchase else str(fallback.get("price") or "")
+            currency = purchase.currency if purchase else str(fallback.get("currency") or "EGP")
+            contact = purchase.contact if purchase else str(fallback.get("contact") or "")
+            branches = purchase.branches if purchase else tuple(fallback.get("branches") or ())
+            purchase_notes = purchase.purchase_notes if purchase else tuple(fallback.get("purchase_notes") or ())
+
+            if not price:
+                raise ValueError(
+                    "لم أجد سعرًا واضحًا في صورة تعليمات الشراء. افتح Advanced لإدخال السعر يدويًا أو استخدم صورة أوضح."
+                )
+
+            detail_lines: list[str] = []
+            for line in (*branches, *purchase_notes):
+                cleaned = str(line).strip()
+                if cleaned and cleaned not in detail_lines:
+                    detail_lines.append(cleaned)
+
+            report = None
+            research_warning = ""
+            try:
+                report = self.runtime.product_research().research(product_name, model)
+            except Exception as exc:
+                research_warning = f"{type(exc).__name__}: {exc}"
+
+            verified_facts = tuple(item.arabic for item in report.verified_facts) if report else ()
+            verified_steps = tuple(item.arabic for item in report.verified_setup_steps) if report else ()
+            seller_instructions = tuple(
+                scene.narration
+                for analysis in analyses
+                for scene in analysis.scenes
+            )
+            brief = ProductAdBrief(
+                product_name=product_name,
+                model=model,
+                price=price,
+                currency=currency or "EGP",
+                details="\n".join(detail_lines),
+                contact=contact,
+                target_seconds=int(self.duration_var.get()),
+            ).normalized()
+            script = build_arabic_product_script(
+                brief,
+                real_video_count=len(self.selected_videos),
+                real_video_role=RealVideoRole.CAMERA_SAMPLE.value,
+                verified_facts=verified_facts,
+                setup_steps=verified_steps,
+                seller_instructions=seller_instructions,
+            )
+
+            preview_lines = [
+                "بيانات AUTO المستخرجة قبل الرندر",
+                f"الموديل: {model}",
+                f"المنتج/الشركة الظاهرة: {product_name or 'غير محسوم من الصورة'}",
+                f"السعر: {price} {currency or 'EGP'}",
+                f"التواصل: {contact or 'غير ظاهر بوضوح'}",
+                "الفروع: " + (" | ".join(branches) if branches else "غير ظاهرة بوضوح"),
+                f"مصادر البحث: {len(report.sources) if report else 0}",
+                f"حقائق موثقة: {len(verified_facts)}",
+                "",
+                "النص المقترح:",
+                script.text,
+            ]
+            warnings = [item for item in (ocr_warning, codecraft_warning, research_warning) if item]
+            if warnings:
+                preview_lines.extend(["", "ملاحظات:", *warnings])
+            return {
+                "product_name": product_name,
+                "price": price,
+                "currency": currency or "EGP",
+                "contact": contact,
+                "details": "\n".join(detail_lines),
+                "analyses": analyses,
+                "preview": "\n".join(preview_lines),
+                "script": script,
+            }
+
+        def run():
+            try:
+                result = worker()
+                def done():
+                    self.product_name_var.set(result["product_name"])
+                    self.price_var.set(result["price"])
+                    self.currency_var.set(result["currency"])
+                    self.contact_var.set(result["contact"])
+                    self._auto_details_text = result["details"]
+                    self.instruction_analyses = result["analyses"]
+                    if self.script_preview is not None:
+                        self.script_preview.configure(state="normal")
+                        self.script_preview.delete("1.0", "end")
+                        self.script_preview.insert("1.0", result["preview"])
+                        self.script_preview.configure(state="disabled")
+                    self._auto_preview_signature = signature
+                    if hasattr(self, "auto_create_button"):
+                        self.auto_create_button.configure(state="normal")
+                    script = result["script"]
+                    self.status_var.set(
+                        f"المعاينة جاهزة • {script.word_count} كلمة • حوالي {script.estimated_seconds} ثانية. "
+                        "راجع البيانات ثم اضغط CREATE COMPLETE AD AUTOMATICALLY."
+                    )
+                self.window.after(0, done)
+            except Exception as exc:
+                self.window.after(
+                    0,
+                    lambda: self.status_var.set(f"تعذر تجهيز AUTO PREVIEW: {type(exc).__name__}: {exc}"),
+                )
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def create_ad(self):
+        if getattr(self, "advanced_mode", False):
+            return ProductAdWindow.create_ad(self)
+        if self._auto_preview_signature != self._auto_signature():
+            if hasattr(self, "auto_create_button"):
+                self.auto_create_button.configure(state="disabled")
+            self.status_var.set("يجب تشغيل AUTO PREVIEW بعد أي تغيير وقبل الرندر النهائي.")
+            return
+        self.video_role_var.set(RealVideoRole.CAMERA_SAMPLE.value)
+        self.video_audio_var.set(RealVideoAudioPolicy.DUCK.value)
+        self.research_var.set(True)
+        self.ai_enhanced_var.set(True)
+        self.auto_ocr_product_images_var.set(True)
+        ProductAdWindow.create_ad(self)
+
+
 def open_product_ad(parent, runtime, *, font_family: str, scale: float, embedded: bool = False, on_back=None) -> ProductAdWindow:
-    return ProductAdWindow(
+    return AutoProductAdWindow(
         parent,
         runtime,
         font_family=font_family,
