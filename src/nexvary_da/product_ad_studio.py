@@ -370,13 +370,11 @@ class ProductAdStudioService:
         voice_name: str,
         preview: bool = False,
     ) -> dict[str, Any]:
+        issues = storyboard.validation_issues(require_files=True)
+        if issues:
+            raise ValueError("Storyboard is not ready: " + " | ".join(issues[:5]))
         scenes = storyboard.enabled_scenes()
-        if not scenes:
-            raise ValueError("Storyboard has no enabled scenes")
         materials = [Path(scene.material) for scene in scenes]
-        missing = [str(path) for path in materials if not path.is_file()]
-        if missing:
-            raise FileNotFoundError("Storyboard material is missing: " + missing[0])
 
         script = "" if preview else storyboard.script_text()
         result = self.runtime.direct_ad_renderer().render(
