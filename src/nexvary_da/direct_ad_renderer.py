@@ -275,8 +275,8 @@ class DirectAdRenderer:
                 timeout=1800,
             )
         else:
-            self._run(
-                [
+            if script.strip():
+                final_args = [
                     ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
                     "-i", str(base_track),
                     "-i", str(subtitle),
@@ -287,9 +287,18 @@ class DirectAdRenderer:
                     "-metadata:s:s:0", "language=ara",
                     "-movflags", "+faststart",
                     str(output),
-                ],
-                timeout=1800,
-            )
+                ]
+            else:
+                final_args = [
+                    ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", str(base_track),
+                    "-t", str(target_seconds),
+                    "-map", "0:v:0", "-map", "0:a:0",
+                    "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    str(output),
+                ]
+            self._run(final_args, timeout=1800)
 
         if not output.is_file() or output.stat().st_size <= 0:
             raise RuntimeError("Final Product Ad MP4 was not created")
