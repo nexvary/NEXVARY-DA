@@ -269,7 +269,7 @@ class ProductAdComposer:
     def import_selected_images(self, selected: list[str] | tuple[str, ...]) -> list[Path]:
         self.guard.require(self.root, Permission.WRITE, must_exist=True)
         if not selected:
-            raise ValueError("Choose at least one product image")
+            return []
         if len(selected) > _MAX_IMAGES:
             raise ValueError(f"Choose no more than {_MAX_IMAGES} product images")
 
@@ -310,7 +310,7 @@ class ProductAdComposer:
     ) -> list[Path]:
         brief = brief.normalized()
         if not images:
-            raise ValueError("No product images were imported")
+            return []
         self.guard.require(self.root, Permission.WRITE, must_exist=True)
 
         job = self.root / ".nexvary-da" / "product-ads" / "jobs" / uuid.uuid4().hex
