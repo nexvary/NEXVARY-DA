@@ -58,6 +58,113 @@ class CodeCraftProductPlan:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class CodeCraftPurchaseInfo:
+    model_id: str
+    product_name: str
+    detected_model: str
+    price: str
+    currency: str
+    contact: str
+    branches: tuple[str, ...]
+    purchase_notes: tuple[str, ...]
+    usage: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "model_id": self.model_id,
+            "product_name": self.product_name,
+            "detected_model": self.detected_model,
+            "price": self.price,
+            "currency": self.currency,
+            "contact": self.contact,
+            "branches": list(self.branches),
+            "purchase_notes": list(self.purchase_notes),
+            "usage": dict(self.usage),
+        }
+
+
+_ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+_CURRENCY_WORDS = (
+    ("EGP", ("جنيه", "ج.م", "egp")),
+    ("AED", ("درهم", "aed")),
+    ("SAR", ("ريال", "sar")),
+    ("USD", ("دولار", "usd", "$")),
+)
+
+
+def extract_purchase_fields(text: str) -> dict[str, Any]:
+    """Extract seller purchase fields conservatively from OCR text.
+
+    This is a deterministic fallback. It only returns values that are visibly
+    present in the supplied OCR text and never guesses missing data.
+    """
+    normalized = str(text or "").translate(_ARABIC_DIGITS)
+    lines = [
+        re.sub(r"\s+", " ", line).strip(" -•|")
+        for line in re.split(r"[\r\n]+", normalized)
+        if re.sub(r"\s+", " ", line).strip(" -•|")
+    ]
+
+    currency = ""
+    price = ""
+    for line in lines:
+        low = line.casefold()
+        line_currency = ""
+        for code, words in _CURRENCY_WORDS:
+            if any(word.casefold() in low for word in words):
+                line_currency = code
+                break
+        price_match = re.search(
+            r"(?:السعر|price)\s*[:：-]?\s*([0-9][0-9\s,.]{0,14})",
+            line,
+            flags=re.I,
+        )
+        if not price_match and line_currency:
+            price_match = re.search(
+                r"([0-9][0-9\s,.]{0,14})\s*(?:جنيه|ج\.م|egp|درهم|aed|ريال|sar|دولار|usd|\$)",
+                line,
+                flags=re.I,
+            )
+        if price_match:
+            candidate = re.sub(r"[\s,]+", "", price_match.group(1)).strip(".")
+            if candidate and any(ch.isdigit() for ch in candidate):
+                price = candidate
+                currency = line_currency or currency
+                break
+
+    phones: list[str] = []
+    for match in re.finditer(r"(?:\+?20[\s-]?)?01[0125](?:[\s-]?\d){8}", normalized):
+        value = re.sub(r"[\s-]+", "", match.group(0))
+        if value not in phones:
+            phones.append(value)
+
+    branches: list[str] = []
+    notes: list[str] = []
+    for line in lines:
+        low = line.casefold()
+        if any(key in low for key in ("فرع", "فروع", "استلام", "العنوان", "المكان", "branch", "pickup")):
+            if line not in branches:
+                branches.append(line)
+        if any(
+            key in low
+            for key in (
+                "شحن", "توصيل", "الدفع", "كاش", "نقد", "حجز", "استلام",
+                "shipping", "delivery", "cash", "payment", "pickup", "reserve",
+            )
+        ):
+            if line not in notes:
+                notes.append(line)
+
+    return {
+        "price": price,
+        "currency": currency,
+        "contact": phones[0] if phones else "",
+        "branches": tuple(branches[:6]),
+        "purchase_notes": tuple(notes[:8]),
+    }
+
+
 def _json_from_text(text: str) -> dict[str, Any]:
     raw = text.strip()
     fence = chr(96) * 3
@@ -402,3 +509,115 @@ class CodeCraftProvider:
             agent="CodeCraft Provider",
         )
         return plan
+
+
+    def analyze_purchase_instructions(
+        self,
+        image_paths: list[str | os.PathLike[str]] | tuple[str | os.PathLike[str], ...],
+        *,
+        ocr_texts: list[str] | tuple[str, ...] = (),
+        model_name: str = "",
+        preferred_model: str = "",
+    ) -> CodeCraftPurchaseInfo:
+        """Extract only seller-visible purchase information from instruction images."""
+        paths = [Path(value).expanduser().resolve(strict=True) for value in image_paths][:4]
+        ocr_blob = "\n".join(str(item).strip() for item in ocr_texts if str(item).strip())
+        if not paths and not ocr_blob:
+            raise ValueError("Purchase instruction image or OCR text is required")
+
+        fallback = extract_purchase_fields(ocr_blob)
+        seller_context = json.dumps(
+            {
+                "requested_model": model_name.strip(),
+                "ocr_text": ocr_blob[:12000],
+            },
+            ensure_ascii=False,
+        )
+        system = (
+            "You extract seller-provided purchase information from images and OCR text. "
+            "Never invent a price, phone number, branch, shipping rule, product name, model, "
+            "warranty, specification, or availability. If a field is not clearly visible, "
+            "return an empty value. Return valid JSON only."
+        )
+        prompt = (
+            "Extract purchase metadata from the supplied seller instruction image(s). "
+            "Context: " + seller_context + ". Return exactly this JSON shape: "
+            "{product_name:string, detected_model:string, price:string, currency:"
+            "one of EGP|AED|SAR|USD|empty, contact:string, branches:[string], "
+            "purchase_notes:[string]}. Keep wording grounded in visible text. "
+            "Do not use general product knowledge and do not infer missing values."
+        )
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for path in paths:
+            content.append({"type": "image_url", "image_url": {"url": _prepared_image_data_uri(path)}})
+
+        response = self.chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": content}],
+            model=preferred_model,
+            require_vision=bool(paths),
+            prefer_json=True,
+            max_tokens=2200,
+            temperature=0.0,
+        )
+        parsed = _json_from_text(str(response.get("content") or ""))
+
+        def clean(value: Any, limit: int = 300) -> str:
+            return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+        def clean_list(value: Any, limit: int) -> tuple[str, ...]:
+            if not isinstance(value, list):
+                return ()
+            result: list[str] = []
+            for item in value:
+                cleaned = clean(item, 500)
+                if cleaned and cleaned not in result:
+                    result.append(cleaned)
+            return tuple(result[:limit])
+
+        price = clean(parsed.get("price"), 80)
+        if price and not any(ch.isdigit() for ch in price):
+            price = ""
+        price = price or str(fallback.get("price") or "")
+
+        currency = clean(parsed.get("currency"), 8).upper()
+        if currency not in {"EGP", "AED", "SAR", "USD"}:
+            currency = str(fallback.get("currency") or "")
+        if currency not in {"EGP", "AED", "SAR", "USD"}:
+            currency = "EGP"
+
+        contact = clean(parsed.get("contact"), 120) or str(fallback.get("contact") or "")
+        branches = clean_list(parsed.get("branches"), 6) or tuple(fallback.get("branches") or ())
+        purchase_notes = clean_list(parsed.get("purchase_notes"), 8) or tuple(
+            fallback.get("purchase_notes") or ()
+        )
+        detected_model = clean(parsed.get("detected_model"), 120)
+        requested_compact = re.sub(r"[^a-z0-9]+", "", model_name.casefold())
+        detected_compact = re.sub(r"[^a-z0-9]+", "", detected_model.casefold())
+        if requested_compact and detected_compact and requested_compact != detected_compact:
+            detected_model = ""
+
+        info = CodeCraftPurchaseInfo(
+            model_id=str(response.get("model") or ""),
+            product_name=clean(parsed.get("product_name"), 160),
+            detected_model=detected_model,
+            price=price,
+            currency=currency,
+            contact=contact,
+            branches=branches,
+            purchase_notes=purchase_notes,
+            usage=dict(response.get("usage") or {}),
+        )
+        self.state.record_event(
+            "product_ad.codecraft.purchase_info",
+            {
+                "model": info.model_id,
+                "image_count": len(paths),
+                "price_found": bool(info.price),
+                "contact_found": bool(info.contact),
+                "branch_count": len(info.branches),
+                "note_count": len(info.purchase_notes),
+                "usage": info.usage,
+            },
+            agent="CodeCraft Provider",
+        )
+        return info
