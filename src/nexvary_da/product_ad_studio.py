@@ -259,6 +259,7 @@ class ProductAdStudioService:
             brief,
             verified_steps,
         )
+        cta_card = self.composer.render_cta_card(brief)
 
         specs: list[tuple[str, StoryboardSceneKind, Path, str, str]] = []
         for index, material in enumerate(frames, 1):
@@ -321,6 +322,15 @@ class ProductAdStudioService:
                     "",
                 )
             )
+        specs.append(
+            (
+                "Call to action",
+                StoryboardSceneKind.CTA,
+                Path(cta_card),
+                "SELLER-PROVIDED PRICE / CONTACT",
+                "",
+            )
+        )
 
         if not specs:
             raise ValueError("لم يتم تجهيز أي مادة بصرية للـStoryboard")
