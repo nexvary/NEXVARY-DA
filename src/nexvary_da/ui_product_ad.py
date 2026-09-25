@@ -817,194 +817,337 @@ class AutoProductAdWindow(ProductAdWindow):
         self._build_auto()
 
     def _build_auto(self):
+        """Build a low-friction studio layout inspired by modern AI video editors."""
         tk = self.tk
-        header = tk.Frame(
-            self.window,
-            bg=PALETTE.surface,
-            highlightbackground=PALETTE.silver,
-            highlightthickness=1,
-        )
-        header.pack(fill="x")
-        tk.Frame(header, bg=PALETTE.magenta, height=self.px(3)).pack(fill="x")
-        self.label(
-            header,
-            "AUTO PRODUCT AD",
-            size=18,
-            fg=PALETTE.magenta,
-            bold=True,
-            rtl=False,
-        ).pack(fill="x", padx=self.px(18), pady=(self.px(12), 0))
-        self.label(
-            header,
-            "موديل + فيديو حقيقي + صورة تعليمات شراء → بحث موثق + OCR + CodeCraft → إعلان كامل",
-            size=8,
-            fg=PALETTE.muted,
-        ).pack(fill="x", padx=self.px(18), pady=(0, self.px(12)))
 
-        body = tk.Frame(self.window, bg=PALETTE.background)
-        body.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(10))
+        studio_bg = "#0B0F17"
+        panel_bg = "#111722"
+        panel_alt = "#171E2B"
+        border = "#273246"
+        text = "#F4F7FB"
+        muted = "#8E9AAD"
+        primary = "#6C63FF"
+        primary_hover = "#827BFF"
+        success = "#3DDC97"
 
-        card = tk.Frame(
+        def studio_label(parent, value: str, *, size=8, fg=text, bold=False, anchor="e"):
+            return tk.Label(
+                parent,
+                text=value,
+                bg=parent.cget("bg"),
+                fg=fg,
+                anchor=anchor,
+                justify="right" if anchor == "e" else "left",
+                font=(self.font, self.px(size), "bold" if bold else "normal"),
+            )
+
+        def studio_button(parent, value: str, command, *, primary_button=False, compact=False):
+            button = tk.Button(
+                parent,
+                text=value,
+                command=command,
+                bg=primary if primary_button else panel_alt,
+                fg="#FFFFFF" if primary_button else text,
+                activebackground=primary_hover if primary_button else "#202A3B",
+                activeforeground="#FFFFFF",
+                relief="flat",
+                bd=0,
+                cursor="hand2",
+                highlightthickness=0,
+                padx=self.px(12 if not compact else 8),
+                pady=self.px(8 if not compact else 5),
+                font=(self.font, self.px(8), "bold"),
+            )
+            return button
+
+        self.window.configure(bg=studio_bg)
+
+        top = tk.Frame(self.window, bg=studio_bg)
+        top.pack(fill="x", padx=self.px(18), pady=(self.px(10), self.px(8)))
+
+        brand = tk.Frame(top, bg=studio_bg)
+        brand.pack(side="left")
+        studio_label(brand, "NEXVARY AI STUDIO", size=12, fg=text, bold=True, anchor="w").pack(anchor="w")
+        studio_label(
+            brand,
+            "Product Ad",
+            size=7,
+            fg=muted,
+            anchor="w",
+        ).pack(anchor="w")
+
+        actions = tk.Frame(top, bg=studio_bg)
+        actions.pack(side="right")
+        studio_button(actions, "Advanced", self._show_advanced, compact=True).pack(side="right", padx=(self.px(6), 0))
+        studio_button(actions, "رجوع", self.close, compact=True).pack(side="right")
+
+        stepbar = tk.Frame(self.window, bg=panel_bg, highlightbackground=border, highlightthickness=1)
+        stepbar.pack(fill="x", padx=self.px(18), pady=(0, self.px(10)))
+        for number, title in (("1", "Assets"), ("2", "Review"), ("3", "Generate")):
+            chip = tk.Frame(stepbar, bg=panel_bg)
+            chip.pack(side="right", padx=self.px(12), pady=self.px(7))
+            tk.Label(
+                chip,
+                text=number,
+                bg=primary if number == "1" else panel_alt,
+                fg="#FFFFFF",
+                width=2,
+                font=(self.font, self.px(7), "bold"),
+            ).pack(side="right", padx=(self.px(5), 0))
+            studio_label(chip, title, size=7, fg=text if number == "1" else muted, bold=number == "1").pack(side="right")
+
+        body = tk.Frame(self.window, bg=studio_bg)
+        body.pack(fill="both", expand=True, padx=self.px(18), pady=(0, self.px(10)))
+
+        sidebar = tk.Frame(
             body,
-            bg=PALETTE.surface,
-            highlightbackground=PALETTE.silver,
+            bg=panel_bg,
+            width=self.px(365),
+            highlightbackground=border,
             highlightthickness=1,
         )
-        card.pack(side="right", fill="both", expand=True, padx=(self.px(5), 0))
-        preview = tk.Frame(
+        sidebar.pack(side="right", fill="y", padx=(self.px(10), 0))
+        sidebar.pack_propagate(False)
+
+        stage = tk.Frame(
             body,
-            bg=PALETTE.surface,
-            highlightbackground=PALETTE.silver,
+            bg=panel_bg,
+            width=self.px(330),
+            highlightbackground=border,
             highlightthickness=1,
         )
-        preview.pack(side="left", fill="both", expand=True, padx=(0, self.px(5)))
+        stage.pack(side="right", fill="y", padx=(self.px(10), 0))
+        stage.pack_propagate(False)
 
-        form = tk.Frame(card, bg=PALETTE.surface)
-        form.pack(fill="both", expand=True, padx=self.px(16), pady=self.px(14))
-
-        self._entry(form, self.model_var, "Model / موديل المنتج", PALETTE.purple)
-
-        videos = tk.Frame(form, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
-        videos.pack(fill="x", pady=(self.px(12), 0))
-        self.label(videos, "Real Product / Camera Sample", size=8, fg=PALETTE.orange, bold=True, rtl=False).pack(
-            side="right", padx=self.px(8), pady=self.px(8)
+        script_panel = tk.Frame(
+            body,
+            bg=panel_bg,
+            highlightbackground=border,
+            highlightthickness=1,
         )
-        tk.Label(
-            videos,
-            textvariable=self.videos_var,
-            bg=PALETTE.surface_alt,
-            fg=PALETTE.muted,
-            anchor="e",
+        script_panel.pack(side="left", fill="both", expand=True)
+
+        # --- Assets / controls -------------------------------------------------
+        side_inner = tk.Frame(sidebar, bg=panel_bg)
+        side_inner.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(12))
+        studio_label(side_inner, "Create product video", size=12, bold=True).pack(fill="x")
+        studio_label(
+            side_inner,
+            "أدخل الموديل وارفع المواد الأساسية فقط. الباقي يقوم به AUTO.",
+            size=7,
+            fg=muted,
+        ).pack(fill="x", pady=(self.px(2), self.px(10)))
+
+        studio_label(side_inner, "Model / الموديل", size=7, fg=muted, bold=True).pack(fill="x", pady=(0, self.px(4)))
+        model_entry = tk.Entry(
+            side_inner,
+            textvariable=self.model_var,
             justify="right",
-            font=(self.font, self.px(7)),
-        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
-        self.button(videos, "ADD VIDEO", self.choose_videos, accent=True).pack(
-            side="left", padx=self.px(5), pady=self.px(5)
+            bg=panel_alt,
+            fg=text,
+            insertbackground=text,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=border,
+            highlightcolor=primary,
+            font=(self.font, self.px(10), "bold"),
         )
-        self.button(videos, "مسح", self.clear_videos).pack(
-            side="left", padx=self.px(5), pady=self.px(5)
+        model_entry.pack(fill="x", ipady=self.px(8))
+
+        def asset_card(title, subtitle_var, button_text, command, clear_command, accent_text):
+            card = tk.Frame(
+                side_inner,
+                bg=panel_alt,
+                highlightbackground=border,
+                highlightthickness=1,
+            )
+            card.pack(fill="x", pady=(self.px(9), 0))
+            info = tk.Frame(card, bg=panel_alt)
+            info.pack(side="right", fill="both", expand=True, padx=self.px(10), pady=self.px(8))
+            studio_label(info, title, size=8, fg=text, bold=True).pack(fill="x")
+            tk.Label(
+                info,
+                textvariable=subtitle_var,
+                bg=panel_alt,
+                fg=muted,
+                anchor="e",
+                justify="right",
+                wraplength=self.px(205),
+                font=(self.font, self.px(7)),
+            ).pack(fill="x", pady=(self.px(2), 0))
+            controls = tk.Frame(card, bg=panel_alt)
+            controls.pack(side="left", padx=self.px(7), pady=self.px(7))
+            studio_button(controls, button_text, command, primary_button=True, compact=True).pack(fill="x")
+            studio_button(controls, "مسح", clear_command, compact=True).pack(fill="x", pady=(self.px(4), 0))
+            return card
+
+        asset_card(
+            "Real sample / فيديو حقيقي",
+            self.videos_var,
+            "+ Video",
+            self.choose_videos,
+            self.clear_videos,
+            success,
+        )
+        asset_card(
+            "Purchase instructions / تعليمات الشراء",
+            self.instruction_images_var,
+            "+ Image",
+            self.choose_instruction_images,
+            self.clear_instruction_images,
+            primary,
+        )
+        asset_card(
+            "Product images / صور المنتج — اختياري",
+            self.images_var,
+            "+ Images",
+            self.choose_images,
+            self.clear_images,
+            muted,
         )
 
-        instructions = tk.Frame(form, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
-        instructions.pack(fill="x", pady=(self.px(8), 0))
-        self.label(instructions, "Purchase Instructions / تعليمات الشراء", size=8, fg=PALETTE.gold, bold=True, rtl=False).pack(
-            side="right", padx=self.px(8), pady=self.px(8)
-        )
-        tk.Label(
-            instructions,
-            textvariable=self.instruction_images_var,
-            bg=PALETTE.surface_alt,
-            fg=PALETTE.muted,
-            anchor="e",
-            justify="right",
-            font=(self.font, self.px(7)),
-        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
-        self.button(instructions, "ADD IMAGE", self.choose_instruction_images, accent=True).pack(
-            side="left", padx=self.px(5), pady=self.px(5)
-        )
-        self.button(instructions, "مسح", self.clear_instruction_images).pack(
-            side="left", padx=self.px(5), pady=self.px(5)
-        )
+        settings = tk.Frame(side_inner, bg=panel_bg)
+        settings.pack(fill="x", pady=(self.px(12), 0))
+        duration_box = tk.Frame(settings, bg=panel_bg)
+        duration_box.pack(side="right", fill="x", expand=True, padx=(self.px(4), 0))
+        voice_box = tk.Frame(settings, bg=panel_bg)
+        voice_box.pack(side="left", fill="x", expand=True, padx=(0, self.px(4)))
 
-        photos = tk.Frame(form, bg=PALETTE.surface_alt, highlightbackground=PALETTE.silver, highlightthickness=1)
-        photos.pack(fill="x", pady=(self.px(8), 0))
-        self.label(photos, "Optional Product Images / صور اختيارية", size=8, fg=PALETTE.cyan, bold=True, rtl=False).pack(
-            side="right", padx=self.px(8), pady=self.px(8)
+        studio_label(duration_box, "Duration", size=7, fg=muted, bold=True).pack(fill="x")
+        duration_menu = tk.OptionMenu(duration_box, self.duration_var, "30", "45", "60")
+        duration_menu.configure(
+            bg=panel_alt, fg=text, activebackground="#202A3B", activeforeground=text,
+            relief="flat", bd=0, highlightthickness=1, highlightbackground=border,
+            font=(self.font, self.px(8), "bold"),
         )
-        tk.Label(
-            photos,
-            textvariable=self.images_var,
-            bg=PALETTE.surface_alt,
-            fg=PALETTE.muted,
-            anchor="e",
-            justify="right",
-            font=(self.font, self.px(7)),
-        ).pack(side="right", fill="x", expand=True, padx=self.px(6))
-        self.button(photos, "ADD", self.choose_images, accent=True).pack(
-            side="left", padx=self.px(5), pady=self.px(5)
-        )
-        self.button(photos, "مسح", self.clear_images).pack(
-            side="left", padx=self.px(5), pady=self.px(5)
-        )
+        duration_menu["menu"].configure(bg=panel_alt, fg=text)
+        duration_menu.pack(fill="x", pady=(self.px(3), 0))
 
-        choices = tk.Frame(form, bg=PALETTE.surface)
-        choices.pack(fill="x", pady=(self.px(10), 0))
-        duration_side = tk.Frame(choices, bg=PALETTE.surface)
-        voice_side = tk.Frame(choices, bg=PALETTE.surface)
-        duration_side.pack(side="right", fill="x", expand=True, padx=(self.px(5), 0))
-        voice_side.pack(side="left", fill="x", expand=True, padx=(0, self.px(5)))
-        self._choice(
-            duration_side,
-            "Duration / المدة",
-            self.duration_var,
-            (("30", "30"), ("45", "45"), ("60", "60")),
-            PALETTE.orange,
-        )
-        self._choice(
-            voice_side,
-            "Voice / الصوت",
+        studio_label(voice_box, "Voice", size=7, fg=muted, bold=True).pack(fill="x")
+        voice_menu = tk.OptionMenu(
+            voice_box,
             self.voice_var,
-            (("Arabic Female", "ar-EG-SalmaNeural"), ("Arabic Male", "ar-EG-ShakirNeural")),
-            PALETTE.cyan,
+            "ar-EG-SalmaNeural",
+            "ar-EG-ShakirNeural",
         )
-
-        self.label(
-            form,
-            "لن يطلب AUTO السعر أو الهاتف أو الفروع إذا كانت ظاهرة بوضوح في صورة تعليمات الشراء؛ سيتم استخراجها وعرضها في المعاينة أولًا.",
-            size=8,
-            fg=PALETTE.action,
-            bold=True,
-        ).pack(fill="x", pady=(self.px(14), self.px(8)))
-
-        self.button(form, "تحليل ومعاينة / AUTO PREVIEW", self.preview_script).pack(
-            fill="x", pady=(self.px(6), self.px(4))
+        voice_menu.configure(
+            bg=panel_alt, fg=text, activebackground="#202A3B", activeforeground=text,
+            relief="flat", bd=0, highlightthickness=1, highlightbackground=border,
+            font=(self.font, self.px(7), "bold"),
         )
-        self.auto_create_button = self.button(
-            form,
-            "CREATE COMPLETE AD AUTOMATICALLY",
+        voice_menu["menu"].configure(bg=panel_alt, fg=text)
+        voice_menu.pack(fill="x", pady=(self.px(3), 0))
+
+        studio_button(
+            side_inner,
+            "Generate preview",
+            self.preview_script,
+        ).pack(fill="x", pady=(self.px(14), self.px(5)))
+        self.auto_create_button = studio_button(
+            side_inner,
+            "Generate video",
             self.create_ad,
-            accent=True,
+            primary_button=True,
         )
-        self.auto_create_button.configure(state="disabled")
-        self.auto_create_button.pack(fill="x", pady=self.px(4))
-        self.button(form, "Advanced / متقدم", self._show_advanced).pack(
-            fill="x", pady=(self.px(8), self.px(4))
-        )
+        self.auto_create_button.configure(state="disabled", disabledforeground="#A9A6D9")
+        self.auto_create_button.pack(fill="x")
 
-        preview_inner = tk.Frame(preview, bg=PALETTE.surface)
-        preview_inner.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(12))
-        self.label(preview_inner, "Preview / المعاينة قبل الرندر", size=10, fg=PALETTE.magenta, bold=True).pack(fill="x")
+        # --- Portrait preview stage -------------------------------------------
+        stage_inner = tk.Frame(stage, bg=panel_bg)
+        stage_inner.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(12))
+        studio_label(stage_inner, "Preview", size=10, bold=True, anchor="w").pack(fill="x")
+        studio_label(stage_inner, "9:16  •  1080×1920", size=7, fg=muted, anchor="w").pack(fill="x")
+
+        portrait = tk.Frame(
+            stage_inner,
+            bg="#05070B",
+            highlightbackground="#333D50",
+            highlightthickness=1,
+            width=self.px(275),
+            height=self.px(480),
+        )
+        portrait.pack(pady=(self.px(12), self.px(10)))
+        portrait.pack_propagate(False)
+        tk.Label(
+            portrait,
+            text="NEXVARY\nPRODUCT AD",
+            bg="#05070B",
+            fg="#D9DEEA",
+            justify="center",
+            font=(self.font, self.px(14), "bold"),
+        ).pack(expand=True)
+        tk.Label(
+            portrait,
+            text="REAL CAMERA SAMPLE",
+            bg="#10231D",
+            fg=success,
+            padx=self.px(8),
+            pady=self.px(4),
+            font=(self.font, self.px(6), "bold"),
+        ).pack(side="bottom", pady=self.px(12))
+
+        studio_label(
+            stage_inner,
+            "الفيديو الحقيقي سيُعرض بوسم واضح، وأي مشهد AI سيُوسم كمشهد توضيحي.",
+            size=7,
+            fg=muted,
+        ).pack(fill="x")
+
+        # --- Script / review panel -------------------------------------------
+        script_inner = tk.Frame(script_panel, bg=panel_bg)
+        script_inner.pack(fill="both", expand=True, padx=self.px(14), pady=self.px(12))
+        row = tk.Frame(script_inner, bg=panel_bg)
+        row.pack(fill="x")
+        studio_label(row, "Script & verified data", size=10, bold=True, anchor="w").pack(side="left")
+        tk.Label(
+            row,
+            text="AUTO",
+            bg="#1A2130",
+            fg="#B7C0D2",
+            padx=self.px(8),
+            pady=self.px(3),
+            font=(self.font, self.px(6), "bold"),
+        ).pack(side="right")
+
+        studio_label(
+            script_inner,
+            "اضغط Generate preview لاستخراج بيانات الشراء والبحث عن الموديل وبناء النص قبل الرندر.",
+            size=7,
+            fg=muted,
+        ).pack(fill="x", pady=(self.px(4), self.px(8)))
+
         self.script_preview = tk.Text(
-            preview_inner,
-            width=48,
-            height=24,
+            script_inner,
             wrap="word",
-            bg=PALETTE.terminal,
-            fg=PALETTE.text,
-            insertbackground=PALETTE.action,
+            bg="#0D121B",
+            fg=text,
+            insertbackground=text,
             relief="flat",
             bd=0,
             state="disabled",
+            padx=self.px(12),
+            pady=self.px(10),
+            highlightthickness=1,
+            highlightbackground=border,
             font=(self.font, self.px(8)),
         )
-        self.script_preview.pack(fill="both", expand=True, pady=(self.px(8), 0))
+        self.script_preview.pack(fill="both", expand=True)
 
-        footer = tk.Frame(self.window, bg=PALETTE.surface)
-        footer.pack(fill="x")
+        footer = tk.Frame(self.window, bg=studio_bg)
+        footer.pack(fill="x", padx=self.px(18), pady=(0, self.px(10)))
         tk.Label(
             footer,
             textvariable=self.status_var,
-            bg=PALETTE.surface,
-            fg=PALETTE.cyan,
+            bg=studio_bg,
+            fg=muted,
             anchor="e",
             justify="right",
-            wraplength=self.px(960),
-            font=(self.font, self.px(8)),
-        ).pack(side="right", fill="x", expand=True, padx=self.px(14), pady=self.px(9))
-        self.button(footer, "رجوع", self.close, accent=True).pack(
-            side="left", padx=self.px(10), pady=self.px(7)
-        )
-        self.status_var.set("أدخل الموديل وأضف فيديو حقيقي وصورة تعليمات الشراء، ثم اضغط AUTO PREVIEW.")
+            wraplength=self.px(1180),
+            font=(self.font, self.px(7)),
+        ).pack(fill="x")
+
+        self.status_var.set("أدخل الموديل وارفع الفيديو الحقيقي وصورة تعليمات الشراء، ثم Generate preview.")
 
     def _show_advanced(self):
         for child in tuple(self.window.winfo_children()):
@@ -1046,7 +1189,7 @@ class AutoProductAdWindow(ProductAdWindow):
             product_name=self.product_name_var.get(),
             model=self.model_var.get(),
             price=self.price_var.get(),
-            currency=self.currency_var.get() or "EGP",
+            currency=self.currency_var.get(),
             details=self._auto_details_text,
             contact=self.contact_var.get(),
             target_seconds=int(self.duration_var.get()),
@@ -1154,25 +1297,37 @@ class AutoProductAdWindow(ProductAdWindow):
             )
 
             preview_lines = [
-                "بيانات AUTO المستخرجة قبل الرندر",
+                "AUTO REVIEW",
+                "────────────────────────",
                 f"الموديل: {model}",
-                f"المنتج/الشركة الظاهرة: {product_name or 'غير محسوم من الصورة'}",
+                f"المنتج/الشركة: {product_name or 'غير محسوم من الصورة'}",
                 f"السعر: {price} {currency}",
                 f"التواصل: {contact or 'غير ظاهر بوضوح'}",
                 "الفروع: " + (" | ".join(branches) if branches else "غير ظاهرة بوضوح"),
-                f"مصادر البحث: {len(report.sources) if report else 0}",
-                f"حقائق موثقة: {len(verified_facts)}",
                 "",
-                "النص المقترح:",
-                script.text,
+                f"حقائق موثقة: {len(verified_facts)}",
+                f"مصادر بحث مطابقة للموديل: {len(report.sources) if report else 0}",
             ]
+            if report and report.sources:
+                preview_lines.extend(["", "SOURCES"])
+                for source in report.sources[:5]:
+                    badge = "OFFICIAL" if source.likely_official else "VERIFIED"
+                    preview_lines.append(f"• {badge} — {source.title or source.url}")
+            preview_lines.extend(
+                [
+                    "",
+                    "SCRIPT",
+                    "────────────────────────",
+                    script.text,
+                ]
+            )
             warnings = [item for item in (ocr_warning, codecraft_warning, research_warning) if item]
             if warnings:
                 preview_lines.extend(["", "ملاحظات:", *warnings])
             return {
                 "product_name": product_name,
                 "price": price,
-                "currency": currency or "EGP",
+                "currency": currency,
                 "contact": contact,
                 "details": "\n".join(detail_lines),
                 "analyses": analyses,
