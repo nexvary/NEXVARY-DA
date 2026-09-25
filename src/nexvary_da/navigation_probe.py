@@ -58,7 +58,12 @@ def _inspect(route: str, window) -> NavigationRoute:
     )
 
 
-def run_navigation_probe(project_root: str | Path) -> NavigationReport:
+def run_navigation_probe(
+    project_root: str | Path,
+    *,
+    width: int = 1600,
+    height: int = 900,
+) -> NavigationReport:
     import inspect
     import tkinter as tk
 
@@ -89,7 +94,7 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
     }
     try:
         app = DeveloperAgentUI(root, project_root)
-        root.geometry("1600x900+20+20")
+        root.geometry(f"{max(1024, int(width))}x{max(700, int(height))}+20+20")
         root.update()
 
         app.show_experience("easy")
