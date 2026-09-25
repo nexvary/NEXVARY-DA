@@ -272,6 +272,70 @@ class ProductSceneDirector:
         if result.returncode != 0:
             raise RuntimeError(result.stdout[-6000:] or f"Could not prepare {source.name}")
 
+    def render_thumbnail(
+        self,
+        media: Path,
+        *,
+        width: int = 270,
+        height: int = 480,
+    ) -> Path:
+        """Create a deterministic portrait thumbnail for Studio storyboard cards."""
+        self.guard.require(self.root, Permission.WRITE, must_exist=True)
+        source = self.guard.require(media, Permission.READ, must_exist=True)
+        job = self.root / ".nexvary-da" / "product-ads" / "thumbnails" / uuid.uuid4().hex
+        safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
+        safe_job.mkdir(parents=True, exist_ok=True)
+        output = safe_job / "thumbnail.png"
+
+        if source.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+            with Image.open(source) as image:
+                thumb = ImageOps.fit(
+                    ImageOps.exif_transpose(image).convert("RGB"),
+                    (max(80, int(width)), max(120, int(height))),
+                    method=Image.Resampling.LANCZOS,
+                )
+                thumb.save(output, "PNG", quality=94)
+        else:
+            self.guard.require(self.root, Permission.SHELL, must_exist=True)
+            result = self.runner.run(
+                [
+                    self._ffmpeg_exe(),
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-ss",
+                    "0.35",
+                    "-i",
+                    str(source),
+                    "-frames:v",
+                    "1",
+                    "-vf",
+                    (
+                        f"scale={max(80, int(width))}:{max(120, int(height))}:"
+                        "force_original_aspect_ratio=increase,"
+                        f"crop={max(80, int(width))}:{max(120, int(height))}"
+                    ),
+                    str(output),
+                ],
+                cwd=self.root,
+                timeout=180,
+            )
+            if result.returncode != 0 or not output.is_file():
+                raise RuntimeError(result.stdout[-6000:] or "Could not create storyboard thumbnail")
+
+        self.state.record_event(
+            "product_ad.storyboard.thumbnail",
+            {
+                "source": str(source),
+                "output": str(output.relative_to(self.root)),
+                "width": max(80, int(width)),
+                "height": max(120, int(height)),
+            },
+            agent="Scene Director",
+        )
+        return output
+
     def extract_reference_frame(self, video: Path) -> Path:
         """Extract a clean reference still from seller-provided real video for AUTO AD mode."""
         self.guard.require(self.root, Permission.SHELL, must_exist=True)
