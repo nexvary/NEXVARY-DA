@@ -87,10 +87,13 @@ def _brand_token(product_name: str) -> str:
 
 
 def _model_matches(text: str, model: str) -> bool:
-    needle = _compact(model)
-    if not needle:
+    parts = re.findall(r"[A-Za-z0-9]+", model)
+    if not parts:
         return True
-    return needle in _compact(text)
+    pattern = r"(?<![A-Za-z0-9])" + r"[^A-Za-z0-9]*".join(
+        re.escape(part) for part in parts
+    ) + r"(?![A-Za-z0-9])"
+    return re.search(pattern, text or "", flags=re.I) is not None
 
 
 def _likely_official(url: str, title: str, product_name: str, model: str = "") -> bool:
