@@ -203,6 +203,41 @@ class ProductStoryboard:
                 3,
             )
 
+    def validation_issues(self, *, require_files: bool = False) -> list[str]:
+        issues: list[str] = []
+        seen_ids: set[str] = set()
+        enabled = self.enabled_scenes()
+        if not enabled:
+            issues.append("Storyboard has no enabled scenes")
+        for index, scene in enumerate(self.scenes, 1):
+            if scene.scene_id in seen_ids:
+                issues.append(f"Scene {index} has a duplicate scene_id")
+            seen_ids.add(scene.scene_id)
+            if not scene.title.strip():
+                issues.append(f"Scene {index} has no title")
+            if scene.enabled and not scene.material.strip():
+                issues.append(f"Scene {index} has no material")
+            if scene.enabled and not 1.0 <= float(scene.duration_seconds) <= 30.0:
+                issues.append(f"Scene {index} duration is outside 1-30 seconds")
+            if require_files and scene.enabled and scene.material:
+                if not Path(scene.material).is_file():
+                    issues.append(f"Scene {index} material is missing: {scene.material}")
+            if scene.kind == StoryboardSceneKind.AI_SUPPORT.value:
+                label = scene.evidence_label.upper()
+                if "AI" not in label:
+                    issues.append(f"Scene {index} AI material is not explicitly labelled")
+            if scene.kind == StoryboardSceneKind.REAL_VIDEO.value:
+                label = scene.evidence_label.upper()
+                if "REAL" not in label:
+                    issues.append(f"Scene {index} real footage is not explicitly labelled")
+        total = self.total_seconds()
+        if enabled and not 15.0 <= total <= 180.0:
+            issues.append(f"Storyboard duration {total:.1f}s is outside 15-180 seconds")
+        return issues
+
+    def ready_for_render(self, *, require_files: bool = False) -> bool:
+        return not self.validation_issues(require_files=require_files)
+
     def to_dict(self, *, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         return {
             "version": self.VERSION,
