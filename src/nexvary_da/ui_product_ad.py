@@ -1101,7 +1101,7 @@ class AutoProductAdWindow(ProductAdWindow):
 
             product_name = purchase.product_name if purchase else ""
             price = purchase.price if purchase else str(fallback.get("price") or "")
-            currency = purchase.currency if purchase else str(fallback.get("currency") or "EGP")
+            currency = purchase.currency if purchase else str(fallback.get("currency") or "")
             contact = purchase.contact if purchase else str(fallback.get("contact") or "")
             branches = purchase.branches if purchase else tuple(fallback.get("branches") or ())
             purchase_notes = purchase.purchase_notes if purchase else tuple(fallback.get("purchase_notes") or ())
@@ -1109,6 +1109,10 @@ class AutoProductAdWindow(ProductAdWindow):
             if not price:
                 raise ValueError(
                     "لم أجد سعرًا واضحًا في صورة تعليمات الشراء. افتح Advanced لإدخال السعر يدويًا أو استخدم صورة أوضح."
+                )
+            if not currency:
+                raise ValueError(
+                    "وجدت السعر لكن لم أجد العملة بوضوح. لن يفترض AUTO عملة من تلقاء نفسه؛ استخدم صورة أوضح أو Advanced."
                 )
 
             detail_lines: list[str] = []
@@ -1135,7 +1139,7 @@ class AutoProductAdWindow(ProductAdWindow):
                 product_name=product_name,
                 model=model,
                 price=price,
-                currency=currency or "EGP",
+                currency=currency,
                 details="\n".join(detail_lines),
                 contact=contact,
                 target_seconds=int(self.duration_var.get()),
@@ -1153,7 +1157,7 @@ class AutoProductAdWindow(ProductAdWindow):
                 "بيانات AUTO المستخرجة قبل الرندر",
                 f"الموديل: {model}",
                 f"المنتج/الشركة الظاهرة: {product_name or 'غير محسوم من الصورة'}",
-                f"السعر: {price} {currency or 'EGP'}",
+                f"السعر: {price} {currency}",
                 f"التواصل: {contact or 'غير ظاهر بوضوح'}",
                 "الفروع: " + (" | ".join(branches) if branches else "غير ظاهرة بوضوح"),
                 f"مصادر البحث: {len(report.sources) if report else 0}",
