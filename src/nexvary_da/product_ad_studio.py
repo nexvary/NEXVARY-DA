@@ -59,6 +59,17 @@ class StudioPreviewResult:
         return "\n".join(lines)
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 class ProductAdStudioService:
     """Prepare, persist and render the editable AUTO Product Ad storyboard."""
 
