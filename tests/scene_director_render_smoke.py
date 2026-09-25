@@ -9,6 +9,8 @@ from PIL import Image
 from nexvary_da.instruction_image import plan_instruction_scenes
 from nexvary_da.permissions import Permission
 from nexvary_da.product_ad import ProductAdBrief
+from nexvary_da.product_ad_studio import ProductAdStudioService
+from nexvary_da.product_storyboard import ProductStoryboard, StoryboardScene, StoryboardSceneKind
 from nexvary_da.product_scene import (
     ProductSceneDirector,
     RealVideoAudioPolicy,
@@ -80,15 +82,31 @@ def main() -> int:
             if not thumbnail.is_file() or thumbnail.stat().st_size <= 0:
                 raise SystemExit("Scene Director did not create a storyboard thumbnail")
 
-            final_render = runtime.direct_ad_renderer().render(
-                [clips[0]],
-                script="",
-                voice_name="",
-                target_seconds=15,
+            storyboard = ProductStoryboard(
+                [
+                    StoryboardScene.create(
+                        title="Real camera sample",
+                        kind=StoryboardSceneKind.REAL_VIDEO,
+                        material=clips[0],
+                        duration_seconds=15,
+                        thumbnail=thumbnail,
+                        evidence_label="REAL CAMERA SAMPLE",
+                    )
+                ]
             )
-            final_path = Path(final_render.output)
+            studio_render = ProductAdStudioService(runtime).render(
+                storyboard,
+                voice_name="",
+                preview=True,
+            )
+            final_path = Path(studio_render["output"])
+            manifest_path = Path(studio_render["manifest"])
             if not final_path.is_file() or final_path.stat().st_size <= 0:
-                raise SystemExit("Direct renderer did not create a final Product Ad")
+                raise SystemExit("Studio renderer did not create a preview Product Ad")
+            if not manifest_path.is_file() or manifest_path.stat().st_size <= 0:
+                raise SystemExit("Studio renderer did not create a render manifest")
+            if len(str(studio_render.get("output_sha256") or "")) != 64:
+                raise SystemExit("Studio renderer did not report a SHA-256 output digest")
 
             audio_probe = subprocess.run(
                 [str(media["ffmpeg"]), "-hide_banner", "-i", str(final_path)],
@@ -143,7 +161,8 @@ def main() -> int:
 
             print(f"clips={len(clips)}")
             print(f"thumbnail={thumbnail}")
-            print(f"direct_render={final_path}")
+            print(f"studio_render={final_path}")
+            print(f"render_manifest={manifest_path}")
             print(f"explainer={explainer}")
             print(f"instruction_storyboard={storyboard}")
             print(f"ai_composite={composites[0]}")
