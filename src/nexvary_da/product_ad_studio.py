@@ -17,6 +17,9 @@ from .product_storyboard import (
 )
 
 
+AUTO_STUDIO_STAGE = 642
+
+
 @dataclass(slots=True)
 class StudioPreviewResult:
     brief: ProductAdBrief
@@ -419,6 +422,7 @@ class ProductAdStudioService:
 
         manifest = {
             "schema": "nexvary.product-ad.render-manifest.v1",
+            "studio_stage": AUTO_STUDIO_STAGE,
             "preview": bool(preview),
             "engine": result["engine"],
             "output": str(output),
