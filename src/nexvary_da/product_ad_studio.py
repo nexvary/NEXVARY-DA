@@ -214,17 +214,33 @@ class ProductAdStudioService:
         imported = self.composer.import_selected_images(selected_images)
         reference_from_video = False
         if not imported and real_video_sources:
-            imported = [director.extract_reference_frame(real_video_sources[0])]
-            reference_from_video = True
+            try:
+                imported = [director.extract_reference_frame(real_video_sources[0])]
+                reference_from_video = True
+            except Exception as exc:
+                warnings.append(f"Reference frame skipped: {type(exc).__name__}: {exc}")
 
-        frames = self.composer.render_frames(imported, brief)
-        prepared_real_videos = director.prepare_real_videos(
-            real_video_sources,
-            role=RealVideoRole.CAMERA_SAMPLE,
-            audio_policy=RealVideoAudioPolicy.DUCK,
-            clip_seconds=7.0,
-            max_total_clips=4,
-        )
+        try:
+            frames = self.composer.render_frames(imported, brief)
+        except Exception as exc:
+            frames = list(imported)
+            warnings.append(
+                f"Styled product frames skipped; raw images used: {type(exc).__name__}: {exc}"
+            )
+
+        try:
+            prepared_real_videos = director.prepare_real_videos(
+                real_video_sources,
+                role=RealVideoRole.CAMERA_SAMPLE,
+                audio_policy=RealVideoAudioPolicy.DUCK,
+                clip_seconds=7.0,
+                max_total_clips=4,
+            )
+        except Exception as exc:
+            prepared_real_videos = list(real_video_sources)
+            warnings.append(
+                f"Real-video preparation skipped; original video used: {type(exc).__name__}: {exc}"
+            )
 
         instruction_scenes = [
             scene
@@ -253,16 +269,36 @@ class ProductAdStudioService:
 
         consumed_ai = min(len(ai_scene_materials), len(instruction_scenes))
         fallback_instruction_scenes = instruction_scenes[consumed_ai:]
-        instruction_storyboard = director.render_instruction_storyboard(
-            brief,
-            fallback_instruction_scenes,
-        )
-        research_cards = self.composer.render_research_cards(brief, verified_facts)
-        operation_explainer = director.render_operation_explainer(
-            brief,
-            verified_steps,
-        )
-        cta_card = self.composer.render_cta_card(brief)
+
+        instruction_storyboard = None
+        try:
+            instruction_storyboard = director.render_instruction_storyboard(
+                brief,
+                fallback_instruction_scenes,
+            )
+        except Exception as exc:
+            warnings.append(f"Instruction storyboard skipped: {type(exc).__name__}: {exc}")
+
+        research_cards = []
+        try:
+            research_cards = self.composer.render_research_cards(brief, verified_facts)
+        except Exception as exc:
+            warnings.append(f"Research cards skipped: {type(exc).__name__}: {exc}")
+
+        operation_explainer = None
+        try:
+            operation_explainer = director.render_operation_explainer(
+                brief,
+                verified_steps,
+            )
+        except Exception as exc:
+            warnings.append(f"Operation explainer skipped: {type(exc).__name__}: {exc}")
+
+        cta_card = None
+        try:
+            cta_card = self.composer.render_cta_card(brief)
+        except Exception as exc:
+            warnings.append(f"CTA card skipped: {type(exc).__name__}: {exc}")
 
         specs: list[tuple[str, StoryboardSceneKind, Path, str, str]] = []
         for index, material in enumerate(frames, 1):
@@ -325,15 +361,16 @@ class ProductAdStudioService:
                     "",
                 )
             )
-        specs.append(
-            (
-                "Call to action",
-                StoryboardSceneKind.CTA,
-                Path(cta_card),
-                "SELLER-PROVIDED PRICE / CONTACT",
-                "",
+        if cta_card is not None:
+            specs.append(
+                (
+                    "Call to action",
+                    StoryboardSceneKind.CTA,
+                    Path(cta_card),
+                    "SELLER-PROVIDED PRICE / CONTACT",
+                    "",
+                )
             )
-        )
 
         if not specs:
             raise ValueError("لم يتم تجهيز أي مادة بصرية للـStoryboard")
@@ -390,22 +427,62 @@ class ProductAdStudioService:
         materials = [Path(scene.material) for scene in scenes]
 
         script = "" if preview else storyboard.script_text()
-        result = self.runtime.direct_ad_renderer().render(
-            materials,
-            script=script,
-            voice_name=voice_name,
-            target_seconds=max(15, int(round(storyboard.total_seconds()))),
-            material_seconds=[scene.duration_seconds for scene in scenes],
-            source_mix=0.42 if preview else 0.28,
-            narration_mix=1.0,
-        ).to_dict()
+        renderer = self.runtime.direct_ad_renderer()
+        render_attempts = [
+            (
+                "full",
+                scenes,
+            ),
+            (
+                "image-scenes",
+                [scene for scene in scenes if Path(scene.material).suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}],
+            ),
+            (
+                "video-scenes",
+                [scene for scene in scenes if Path(scene.material).suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}],
+            ),
+        ]
+        rendered = None
+        render_mode = ""
+        render_errors: list[str] = []
+        seen: set[tuple[str, ...]] = set()
+        for mode, attempt_scenes in render_attempts:
+            if not attempt_scenes:
+                continue
+            signature = tuple(scene.material for scene in attempt_scenes)
+            if signature in seen:
+                continue
+            seen.add(signature)
+            try:
+                rendered = renderer.render(
+                    [Path(scene.material) for scene in attempt_scenes],
+                    script=script if not preview else "",
+                    voice_name=voice_name,
+                    target_seconds=max(15, int(round(sum(scene.duration_seconds for scene in attempt_scenes)))),
+                    material_seconds=[scene.duration_seconds for scene in attempt_scenes],
+                    source_mix=0.42 if preview else 0.28,
+                    narration_mix=1.0,
+                )
+                render_mode = mode
+                scenes = attempt_scenes
+                materials = [Path(scene.material) for scene in scenes]
+                break
+            except Exception as exc:
+                render_errors.append(f"{mode}: {type(exc).__name__}: {exc}")
+
+        if rendered is None:
+            raise RuntimeError("All Studio render attempts failed. " + " | ".join(render_errors[-3:]))
+
+        result = rendered.to_dict()
         result.update(
             {
                 "engine": "nexvary-direct-storyboard",
                 "returncode": 0,
                 "storyboard_scenes": len(scenes),
-                "storyboard_seconds": storyboard.total_seconds(),
+                "storyboard_seconds": round(sum(scene.duration_seconds for scene in scenes), 3),
                 "preview_render": bool(preview),
+                "render_mode": render_mode,
+                "render_errors": tuple(render_errors),
             }
         )
 
