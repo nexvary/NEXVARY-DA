@@ -199,6 +199,9 @@ class DirectAdRenderer:
         script: str,
         voice_name: str,
         target_seconds: int = 60,
+        material_seconds: list[float] | tuple[float, ...] | None = None,
+        narration_mix: float = 1.0,
+        source_mix: float = 0.32,
     ) -> DirectAdRenderResult:
         selected = [Path(item).resolve(strict=True) for item in materials if Path(item).is_file()]
         if not selected:
@@ -211,11 +214,19 @@ class DirectAdRenderer:
         safe_job = self.guard.require(job, Permission.WRITE, must_exist=False)
         safe_job.mkdir(parents=True, exist_ok=True)
 
-        per_material = max(2.5, min(8.0, target_seconds / max(1, len(selected))))
+        if material_seconds is not None:
+            if len(material_seconds) != len(selected):
+                raise ValueError("material_seconds must match the number of visual materials")
+            durations = [max(1.0, min(30.0, float(value))) for value in material_seconds]
+            target_seconds = max(15, min(180, int(round(sum(durations)))))
+        else:
+            per_material = max(2.5, min(8.0, target_seconds / max(1, len(selected))))
+            durations = [per_material for _ in selected]
+
         segments: list[Path] = []
-        for index, source in enumerate(selected, 1):
+        for index, (source, seconds) in enumerate(zip(selected, durations), 1):
             segment = safe_job / f"segment-{index:02d}.mp4"
-            self._segment(source, segment, seconds=per_material)
+            self._segment(source, segment, seconds=seconds)
             segments.append(segment)
 
         ffmpeg = self._ffmpeg_exe()
@@ -263,7 +274,9 @@ class DirectAdRenderer:
                     "-i", str(subtitle),
                     "-t", str(target_seconds),
                     "-filter_complex",
-                    "[0:a:0][1:a:0]amix=inputs=2:duration=longest:dropout_transition=0,"
+                    f"[0:a:0]volume={max(0.0, min(2.0, float(source_mix))):.3f}[src];"
+                    f"[1:a:0]volume={max(0.0, min(2.0, float(narration_mix))):.3f}[voice];"
+                    "[src][voice]amix=inputs=2:duration=longest:dropout_transition=0,"
                     f"atrim=0:{target_seconds},apad[a]",
                     "-map", "0:v:0", "-map", "[a]", "-map", "2:0?",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
