@@ -68,6 +68,7 @@ def run_navigation_probe(
     import tkinter as tk
 
     from .ui_app import DeveloperAgentUI
+    from .ui_theme import scale_for_screen
     from .ui_info import open_about_window, open_system_overview_window
     from .ui_integration_center import IntegrationCenter
     from .ui_product_ad import ProductAdWindow
@@ -93,7 +94,11 @@ def run_navigation_probe(
         "open_video_studio",
     }
     try:
-        app = DeveloperAgentUI(root, project_root)
+        app = DeveloperAgentUI(
+            root,
+            project_root,
+            ui_scale=scale_for_screen(int(width), int(height)),
+        )
         root.geometry(f"{max(1024, int(width))}x{max(700, int(height))}+20+20")
         root.update()
 
