@@ -646,7 +646,82 @@ class ProductSceneDirector:
                 with Image.open(path) as generated:
                     background = generated.convert("RGB")
             except Exception:
-                outputs.append(path)
+                # AI video outputs stay separate from real camera footage and receive
+                # an explicit supporting-visual badge before entering the final renderer.
+                self.guard.require(self.root, Permission.SHELL, must_exist=True)
+                badge = safe_job / f"ai-video-badge-{index:02d}.png"
+                badge_canvas = Image.new("RGBA", (920, 150), (0, 0, 0, 0))
+                badge_draw = ImageDraw.Draw(badge_canvas)
+                badge_draw.rounded_rectangle(
+                    (4, 4, 916, 146),
+                    radius=30,
+                    fill=(6, 12, 22, 230),
+                    outline=(156, 92, 255, 255),
+                    width=5,
+                )
+                _draw_text(
+                    badge_draw,
+                    (880, 58),
+                    "مشهد توضيحي مولّد بالذكاء الاصطناعي",
+                    font=_font(34, bold=True),
+                    fill="#DCC8FF",
+                    anchor="ra",
+                )
+                _draw_text(
+                    badge_draw,
+                    (40, 112),
+                    "AI-GENERATED SUPPORTING VISUAL",
+                    font=_font(22, bold=True),
+                    fill="#E4EDF5",
+                    anchor="la",
+                    rtl=False,
+                )
+                badge_canvas.save(badge, "PNG")
+
+                output = safe_job / f"ai-scene-{index:02d}.mp4"
+                result = self.runner.run(
+                    [
+                        self._ffmpeg_exe(),
+                        "-y",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        str(path),
+                        "-loop",
+                        "1",
+                        "-i",
+                        str(badge),
+                        "-filter_complex",
+                        "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+                        "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black[base];"
+                        "[1:v]scale=900:-1[badge];"
+                        "[base][badge]overlay=(W-w)/2:64:format=auto[v]",
+                        "-map",
+                        "[v]",
+                        "-map",
+                        "0:a?",
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "medium",
+                        "-crf",
+                        "20",
+                        "-pix_fmt",
+                        "yuv420p",
+                        "-c:a",
+                        "aac",
+                        "-b:a",
+                        "128k",
+                        "-shortest",
+                        str(output),
+                    ],
+                    cwd=self.root,
+                    timeout=900,
+                )
+                if result.returncode != 0 or not output.is_file():
+                    raise RuntimeError(result.stdout[-6000:] or "Could not label AI video scene")
+                outputs.append(output)
                 continue
 
             canvas = ImageOps.fit(background, size, method=Image.Resampling.LANCZOS).convert("RGBA")
@@ -678,6 +753,30 @@ class ProductSceneDirector:
             canvas.alpha_composite(real_product, (px, py))
 
             draw = ImageDraw.Draw(canvas)
+            draw.rounded_rectangle(
+                (58, 58, width - 58, 178),
+                radius=28,
+                fill=(6, 12, 22, 225),
+                outline="#9C5CFF",
+                width=4,
+            )
+            _draw_text(
+                draw,
+                (width - 90, 108),
+                "مشهد توضيحي مولّد بالذكاء الاصطناعي",
+                font=_font(34, bold=True),
+                fill="#DCC8FF",
+                anchor="ra",
+            )
+            _draw_text(
+                draw,
+                (90, 150),
+                "AI-GENERATED SUPPORTING VISUAL",
+                font=_font(21, bold=True),
+                fill="#E4EDF5",
+                anchor="la",
+                rtl=False,
+            )
             _draw_text(
                 draw,
                 (width - 92, py - 35),
