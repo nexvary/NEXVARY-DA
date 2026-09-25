@@ -284,6 +284,7 @@ def run_runtime_ui_probe(
 ) -> UIProbeReport:
     import tkinter as tk
     from .ui_app import DeveloperAgentUI
+    from .ui_theme import scale_for_screen
 
     runtime = ProjectRuntime(project_root)
     try:
@@ -296,7 +297,11 @@ def run_runtime_ui_probe(
     root = tk.Tk()
     app = None
     try:
-        app = DeveloperAgentUI(root, project_root)
+        app = DeveloperAgentUI(
+            root,
+            project_root,
+            ui_scale=scale_for_screen(int(width), int(height)),
+        )
         root.geometry(f"{max(1024, int(width))}x{max(700, int(height))}+20+20")
         root.update_idletasks()
         root.update()
