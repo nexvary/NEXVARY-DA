@@ -49,6 +49,7 @@ class AutoProductAdHelperTests(unittest.TestCase):
         self.assertTrue(_model_matches("Official manual for VTS30-G-F camera", "VTS30-G-F"))
         self.assertTrue(_model_matches("VTS30 G F specifications", "VTS30-G-F"))
         self.assertFalse(_model_matches("Official manual for VTS30-G-E camera", "VTS30-G-F"))
+        self.assertFalse(_model_matches("Official manual for VTS30-G-FX camera", "VTS30-G-F"))
 
 
 if __name__ == "__main__":
