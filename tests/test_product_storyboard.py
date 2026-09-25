@@ -74,6 +74,37 @@ class ProductStoryboardTests(unittest.TestCase):
         self.assertEqual([s.title for s in board.scenes], [s.title for s in loaded.scenes])
         self.assertEqual(board.script_text(), loaded.script_text())
 
+    def test_validation_requires_labels_for_real_and_ai_scenes(self):
+        board = ProductStoryboard(
+            [
+                StoryboardScene.create(
+                    title="Real",
+                    kind=StoryboardSceneKind.REAL_VIDEO,
+                    material="real.mp4",
+                    duration_seconds=15,
+                    evidence_label="",
+                )
+            ]
+        )
+        issues = board.validation_issues()
+        self.assertTrue(any("real footage" in issue for issue in issues))
+
+        board.scene(0).evidence_label = "REAL CAMERA SAMPLE"
+        self.assertFalse(any("real footage" in issue for issue in board.validation_issues()))
+
+    def test_validation_rejects_too_short_storyboard(self):
+        board = ProductStoryboard(
+            [
+                StoryboardScene.create(
+                    title="Product",
+                    kind=StoryboardSceneKind.PRODUCT,
+                    material="product.png",
+                    duration_seconds=4,
+                )
+            ]
+        )
+        self.assertTrue(any("outside 15-180" in issue for issue in board.validation_issues()))
+
     def test_split_narration_does_not_drop_words(self):
         text = "واحد اثنان ثلاثة أربعة خمسة ستة سبعة ثمانية تسعة عشرة"
         chunks = split_narration_for_scenes(text, 4)
