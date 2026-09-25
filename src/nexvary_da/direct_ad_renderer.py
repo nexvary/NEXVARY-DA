@@ -121,8 +121,11 @@ class DirectAdRenderer:
         output: Path,
         *,
         seconds: float,
+        transition_seconds: float = 0.18,
     ) -> None:
         ffmpeg = self._ffmpeg_exe()
+        transition = max(0.0, min(0.45, float(transition_seconds), float(seconds) / 3.0))
+        fade_out = max(0.0, float(seconds) - transition)
         video_args = [
             "-c:v", "libx264", "-preset", "medium", "-crf", "21",
             "-r", "30", "-pix_fmt", "yuv420p",
@@ -135,7 +138,8 @@ class DirectAdRenderer:
                 "scale=1080:1920:force_original_aspect_ratio=decrease,"
                 "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,"
                 f"zoompan=z='min(zoom+0.00035,1.025)':d={frames}:s=1080x1920:fps=30,"
-                "setsar=1,format=yuv420p"
+                f"setsar=1,fade=t=in:st=0:d={transition:.3f},"
+                f"fade=t=out:st={fade_out:.3f}:d={transition:.3f},format=yuv420p"
             )
             args = [
                 ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
@@ -152,7 +156,8 @@ class DirectAdRenderer:
             vf = (
                 "scale=1080:1920:force_original_aspect_ratio=decrease,"
                 "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,"
-                "setsar=1,fps=30,format=yuv420p"
+                f"setsar=1,fps=30,fade=t=in:st=0:d={transition:.3f},"
+                f"fade=t=out:st={fade_out:.3f}:d={transition:.3f},format=yuv420p"
             )
             has_audio = self._has_audio(source)
             args = [
@@ -202,6 +207,7 @@ class DirectAdRenderer:
         material_seconds: list[float] | tuple[float, ...] | None = None,
         narration_mix: float = 1.0,
         source_mix: float = 0.32,
+        transition_seconds: float = 0.18,
     ) -> DirectAdRenderResult:
         selected = [Path(item).resolve(strict=True) for item in materials if Path(item).is_file()]
         if not selected:
@@ -226,7 +232,12 @@ class DirectAdRenderer:
         segments: list[Path] = []
         for index, (source, seconds) in enumerate(zip(selected, durations), 1):
             segment = safe_job / f"segment-{index:02d}.mp4"
-            self._segment(source, segment, seconds=seconds)
+            self._segment(
+                source,
+                segment,
+                seconds=seconds,
+                transition_seconds=transition_seconds,
+            )
             segments.append(segment)
 
         ffmpeg = self._ffmpeg_exe()
