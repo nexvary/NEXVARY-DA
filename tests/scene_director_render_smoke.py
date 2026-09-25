@@ -76,6 +76,10 @@ def main() -> int:
             if not clips or not all(path.is_file() and path.stat().st_size > 0 for path in clips):
                 raise SystemExit(f"Scene Director did not render real-video clips: {clips}")
 
+            thumbnail = director.render_thumbnail(clips[0], width=180, height=320)
+            if not thumbnail.is_file() or thumbnail.stat().st_size <= 0:
+                raise SystemExit("Scene Director did not create a storyboard thumbnail")
+
             final_render = runtime.direct_ad_renderer().render(
                 [clips[0]],
                 script="",
@@ -138,6 +142,7 @@ def main() -> int:
                 raise SystemExit("Scene Director AI product composite was not rendered")
 
             print(f"clips={len(clips)}")
+            print(f"thumbnail={thumbnail}")
             print(f"direct_render={final_path}")
             print(f"explainer={explainer}")
             print(f"instruction_storyboard={storyboard}")
