@@ -359,10 +359,8 @@ class VideoStudioWindow:
                         after(result)
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.status_var.set(f"{label} failed • {type(exc).__name__}: {exc}"),
-                )
+                message = f"{label} failed • {type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                self.window.after(0, lambda value=message: self.status_var.set(value))
         threading.Thread(target=worker, daemon=True).start()
 
     def prepare_engine(self, engine: str):
