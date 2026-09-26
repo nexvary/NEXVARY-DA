@@ -45,6 +45,10 @@ jobs:
       - name: Scene Director media smoke
         run: python tests/scene_director_render_smoke.py
 
+      - name: Public media quality acceptance
+        if: runner.os == 'Linux'
+        run: python tests/public_media_quality_smoke.py
+
       - name: Diff check
         run: git diff --check
 
