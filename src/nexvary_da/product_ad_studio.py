@@ -11,6 +11,7 @@ from .adaptive_video import AdaptiveVideoRouter
 from .codecraft import extract_purchase_fields
 from .product_ad import ProductAdBrief, ProductAdScript, build_arabic_product_script
 from .product_scene import RealVideoAudioPolicy, RealVideoRole
+from .video_quality import EnhancementMode, VideoQualityEnhancer
 from .product_storyboard import (
     ProductStoryboard,
     StoryboardScene,
@@ -476,6 +477,14 @@ class ProductAdStudioService:
             raise RuntimeError("All Studio render attempts failed. " + " | ".join(render_errors[-3:]))
 
         result = rendered.to_dict()
+        quality = VideoQualityEnhancer().enhance(
+            Path(str(result["output"])),
+            mode=EnhancementMode.BALANCED if not preview else EnhancementMode.OFF,
+        )
+        if quality.enhanced:
+            result["original_output"] = result["output"]
+            result["output"] = quality.output
+        result["quality_enhancement"] = quality.to_dict()
         result.update(
             {
                 "engine": "nexvary-direct-storyboard",
