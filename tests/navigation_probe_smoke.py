@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import tempfile
 from pathlib import Path
@@ -10,6 +11,11 @@ from nexvary_da.project import init_project
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--width", type=int, default=1600)
+    parser.add_argument("--height", type=int, default=900)
+    args = parser.parse_args()
+
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "pyproject.toml").write_text(
@@ -26,7 +32,7 @@ def main() -> int:
                 Permission.DESKTOP_AUTOMATION,
             },
         )
-        report = run_navigation_probe(root)
+        report = run_navigation_probe(root, width=args.width, height=args.height)
         print(json.dumps(report.to_dict(), indent=2, ensure_ascii=False))
         return 0 if report.ready else 2
 

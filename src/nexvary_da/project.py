@@ -7,10 +7,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .agents import AgentPool
+from .ai_scene import ComfyUISceneGenerator
+from .ai_video import AIVideoRouter
 from .checkpoint import CheckpointStore
+from .codecraft import CodeCraftProvider
 from .android_profile import AndroidTools
 from .android_ui import AndroidUIHarness
 from .cua_adapter import CuaDriverAdapter
+from .direct_ad_renderer import DirectAdRenderer
 from .fastmcp_gateway import FastMCPGateway
 from .media_adapters import MoneyPrinterTurboAdapter, QwenImageAdapter, VoiceStudioAdapter
 from .oya_adapter import OyaBrowserAdapter
@@ -20,12 +24,16 @@ from .file_tools import FileTools
 from .github_client import GitHubRESTClient
 from .git_tools import GitTools
 from .integration_settings import IntegrationSettings
+from .instruction_image import InstructionImageInterpreter
 from .permissions import Permission, WorkspaceGuard, WorkspacePolicy
 from .process import ProcessRunner
 from .process_registry import ProcessRegistry
 from .plan_execution import PlanExecutionManager
 from .product_ad import ProductAdComposer
+from .product_research import ProductResearcher
+from .product_scene import ProductSceneDirector
 from .release_gate import ReleaseGate
+from .secret_store import SecretStore
 from .state import ProjectState
 from .terminal import PersistentTerminal
 from .terminal_pool import TerminalPool
@@ -146,6 +154,18 @@ class ProjectRuntime:
     def integration_settings(self) -> IntegrationSettings:
         return IntegrationSettings(self.guard, self.root)
 
+    def secret_store(self) -> SecretStore:
+        return SecretStore(self.guard, self.root)
+
+    def codecraft(self) -> CodeCraftProvider:
+        return CodeCraftProvider(
+            self.guard,
+            self.state,
+            self.root,
+            self.integration_settings(),
+            self.secret_store(),
+        )
+
     def plugins(self) -> PluginHub:
         return PluginHub(self.guard, self.state, self.root)
 
@@ -184,6 +204,50 @@ class ProjectRuntime:
 
     def product_ads(self) -> ProductAdComposer:
         return ProductAdComposer(self.guard, self.state, self.root)
+
+    def ai_video(self) -> AIVideoRouter:
+        return AIVideoRouter(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+            self.integration_settings(),
+        )
+
+    def ai_scene_generator(self) -> ComfyUISceneGenerator:
+        return ComfyUISceneGenerator(
+            self.guard,
+            self.state,
+            self.root,
+            self.integration_settings(),
+        )
+
+    def instruction_images(self) -> InstructionImageInterpreter:
+        return InstructionImageInterpreter(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+        )
+
+    def product_research(self) -> ProductResearcher:
+        return ProductResearcher(self.guard, self.state, self.root)
+
+    def product_scene_director(self) -> ProductSceneDirector:
+        return ProductSceneDirector(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+        )
+
+    def direct_ad_renderer(self) -> DirectAdRenderer:
+        return DirectAdRenderer(
+            self.guard,
+            self.runner,
+            self.state,
+            self.root,
+        )
 
     def release_gate(self) -> ReleaseGate:
         return ReleaseGate(self.root, self.runner, self.state)

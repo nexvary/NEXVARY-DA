@@ -41,7 +41,7 @@ _PLUGIN_HELP = {
 
 
 class IntegrationCenter:
-    def __init__(self, parent, runtime, *, font_family: str, scale: float, on_change=None):
+    def __init__(self, parent, runtime, *, font_family: str, scale: float, on_change=None, embedded: bool = False, on_back=None):
         import tkinter as tk
 
         self.tk = tk
@@ -50,13 +50,19 @@ class IntegrationCenter:
         self.font = font_family
         self.scale = scale
         self.on_change = on_change
+        self.embedded = bool(embedded)
+        self.on_back = on_back
         self.store = runtime.integration_settings()
-        self.window = tk.Toplevel(parent)
-        self.window.title("NEXVARY — Tools & Integrations")
-        self.window.configure(bg=PALETTE.background)
-        self.window.geometry("980x700")
-        self.window.minsize(860, 620)
-        self.window.transient(parent)
+        if self.embedded:
+            self.window = tk.Frame(parent, bg=PALETTE.background)
+            self.window.pack(fill="both", expand=True)
+        else:
+            self.window = tk.Toplevel(parent)
+            self.window.title("NEXVARY — Tools & Integrations")
+            self.window.configure(bg=PALETTE.background)
+            self.window.geometry("980x700")
+            self.window.minsize(860, 620)
+            self.window.transient(parent)
         self.selected_id = tk.StringVar(value="fastmcp")
         self.status_var = tk.StringVar(value="")
         self.fields: dict[str, tk.StringVar] = {}
@@ -149,7 +155,13 @@ class IntegrationCenter:
             font=(self.font, self.px(8)),
         ).pack(side="left", fill="x", expand=True, padx=self.px(16), pady=self.px(10))
         self.button(bottom, "RECHECK", self.refresh).pack(side="right", padx=self.px(6), pady=self.px(8))
-        self.button(bottom, "CLOSE", self.window.destroy).pack(side="right", padx=self.px(6), pady=self.px(8))
+        self.button(bottom, "BACK / رجوع", self.close).pack(side="right", padx=self.px(6), pady=self.px(8))
+
+    def close(self):
+        if callable(self.on_back):
+            self.on_back()
+            return
+        self.window.destroy()
 
     def refresh(self):
         self.statuses = self.runtime.plugins().all_statuses()
@@ -320,11 +332,13 @@ class IntegrationCenter:
             self.status_var.set(f"Could not save: {type(exc).__name__}: {exc}")
 
 
-def open_integration_center(parent, runtime, *, font_family: str, scale: float, on_change=None):
+def open_integration_center(parent, runtime, *, font_family: str, scale: float, on_change=None, embedded: bool = False, on_back=None):
     return IntegrationCenter(
         parent,
         runtime,
         font_family=font_family,
         scale=scale,
         on_change=on_change,
+        embedded=embedded,
+        on_back=on_back,
     )

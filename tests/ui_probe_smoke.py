@@ -15,6 +15,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--screenshot-output", default="")
     parser.add_argument("--require-screenshot", action="store_true")
+    parser.add_argument("--width", type=int, default=1600)
+    parser.add_argument("--height", type=int, default=900)
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -36,8 +38,8 @@ def main() -> int:
         screenshot_rel = ".nexvary-da/ui-probe.png" if args.screenshot_output else None
         report = run_runtime_ui_probe(
             root,
-            width=1600,
-            height=900,
+            width=args.width,
+            height=args.height,
             screenshot=screenshot_rel,
             require_screenshot=args.require_screenshot,
         )

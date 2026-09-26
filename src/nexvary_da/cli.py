@@ -13,6 +13,7 @@ from .mcp_server import run_mcp
 from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime, init_project
+from .product_scene import ProductSceneDirector
 from .project_import import ProjectImporter
 from .provenance import build_provenance, write_provenance
 from .signing_readiness import inspect_signing_readiness
@@ -122,6 +123,12 @@ def build_parser() -> argparse.ArgumentParser:
     integrations = sub.add_parser("integrations", help="Show optional automation/media integration readiness")
     integrations.add_argument("path", nargs="?", default=".")
 
+    codecraft = sub.add_parser("codecraft-status", help="Check CodeCraft API configuration without revealing the key")
+    codecraft.add_argument("path", nargs="?", default=".")
+
+    ai_hw = sub.add_parser("ai-hardware", help="Inspect hardware and AI-video engine suitability")
+    ai_hw.add_argument("path", nargs="?", default=".")
+
     fastmcp = sub.add_parser("fastmcp-run", help="Start an approved FastMCP server")
     fastmcp.add_argument("target")
     fastmcp.add_argument("--path", default=".")
@@ -157,6 +164,11 @@ def build_parser() -> argparse.ArgumentParser:
     mpt = sub.add_parser("moneyprinter-video", help="Run a configured MoneyPrinterTurbo video job")
     mpt.add_argument("subject")
     mpt.add_argument("--path", default=".")
+
+    sub.add_parser(
+        "scene-runtime",
+        help="Check the bundled Product Ad Scene Director media runtime",
+    )
 
     for name, help_text in (
         ("status", "Show durable project state"),
@@ -216,6 +228,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "mcp":
         run_mcp(args.path)
         return 0
+
+    if args.command == "scene-runtime":
+        payload = ProductSceneDirector.media_runtime_status()
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        return 0 if payload.get("ready") is True else 2
 
     runtime = ProjectRuntime(args.path)
     try:
@@ -278,6 +295,23 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "integrations":
             payload = runtime.plugins().snapshot()
             payload["custom_manifests"] = runtime.plugins().load_custom_manifests()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0
+
+        if args.command == "codecraft-status":
+            payload = runtime.codecraft().status()
+            print(json.dumps(payload, indent=2, ensure_ascii=False))
+            return 0 if payload.get("ready") is True else 2
+
+        if args.command == "ai-hardware":
+            router = runtime.ai_video()
+            payload = {
+                "hardware": router.hardware().to_dict(),
+                "engines": [item.to_dict() for item in router.assessments()],
+                "selected": router.choose_engine(
+                    runtime.integration_settings().get("ai_video_mode", default="hybrid")
+                ).to_dict(),
+            }
             print(json.dumps(payload, indent=2, ensure_ascii=False))
             return 0
 

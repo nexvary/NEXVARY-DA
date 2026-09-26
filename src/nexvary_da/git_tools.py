@@ -12,17 +12,27 @@ class GitTools:
         self.runner = runner
         self.root = guard.require(root, Permission.READ, must_exist=True)
 
+    def is_repository(self) -> bool:
+        """Cheap repository test used by the desktop UI hot path."""
+        return (self.root / ".git").exists()
+
     def _git(self, *args: str, timeout: float = 120) -> ProcessResult:
         return self.runner.run(["git", *args], cwd=self.root, timeout=timeout)
 
     def status(self) -> ProcessResult:
+        if not self.is_repository():
+            return ProcessResult(["git", "status"], 128, "not a git repository", 0.0)
         return self._git("status", "--porcelain=v1", "--branch")
 
     def branch(self) -> str | None:
+        if not self.is_repository():
+            return None
         result = self._git("branch", "--show-current")
         return result.stdout.strip() or None if result.returncode == 0 else None
 
     def commit(self) -> str | None:
+        if not self.is_repository():
+            return None
         result = self._git("rev-parse", "HEAD")
         return result.stdout.strip() or None if result.returncode == 0 else None
 
@@ -30,6 +40,8 @@ class GitTools:
         return self._git("diff", "--", *paths)
 
     def changed_files(self) -> list[str]:
+        if not self.is_repository():
+            return []
         commands = (
             ("diff", "--name-only"),
             ("diff", "--cached", "--name-only"),

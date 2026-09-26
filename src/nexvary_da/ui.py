@@ -9,6 +9,10 @@ def launch_ui(root: str | Path) -> None:
     from .ui_app import DeveloperAgentUI
 
     window = tk.Tk()
+    window.withdraw()
     app = DeveloperAgentUI(window, root)
     window.protocol("WM_DELETE_WINDOW", app.close)
+    window.update_idletasks()
+    window.deiconify()
+    window.lift()
     window.mainloop()

@@ -58,11 +58,17 @@ def _inspect(route: str, window) -> NavigationRoute:
     )
 
 
-def run_navigation_probe(project_root: str | Path) -> NavigationReport:
+def run_navigation_probe(
+    project_root: str | Path,
+    *,
+    width: int = 1600,
+    height: int = 900,
+) -> NavigationReport:
     import inspect
     import tkinter as tk
 
     from .ui_app import DeveloperAgentUI
+    from .ui_theme import scale_for_screen
     from .ui_info import open_about_window, open_system_overview_window
     from .ui_integration_center import IntegrationCenter
     from .ui_product_ad import ProductAdWindow
@@ -88,8 +94,12 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
         "open_video_studio",
     }
     try:
-        app = DeveloperAgentUI(root, project_root)
-        root.geometry("1600x900+20+20")
+        app = DeveloperAgentUI(
+            root,
+            project_root,
+            ui_scale=scale_for_screen(int(width), int(height)),
+        )
+        root.geometry(f"{max(1024, int(width))}x{max(700, int(height))}+20+20")
         root.update()
 
         app.show_experience("easy")
@@ -97,6 +107,28 @@ def run_navigation_probe(project_root: str | Path) -> NavigationReport:
 
         app.show_experience("advanced")
         routes.append(_inspect("main.advanced", root))
+
+        for page in ("product_ad", "ai_models", "video", "integrations", "toolbox", "about", "system"):
+            app.show_page(page)
+            root.update_idletasks()
+            root.update()
+            route = _inspect(f"single_window.{page}", root)
+            popup_count = sum(
+                1
+                for child in root.winfo_children()
+                if str(child.winfo_class()) == "Toplevel" and bool(child.winfo_ismapped())
+            )
+            if popup_count:
+                route = NavigationRoute(
+                    route.route,
+                    False,
+                    route.widget_count,
+                    route.interactive_count,
+                    route.error_count + popup_count,
+                    (route.details + "; " if route.details else "") + f"unexpected popup windows: {popup_count}",
+                )
+            routes.append(route)
+        app.show_experience("easy")
 
         about = open_about_window(root, font_family=app.font, scale=app.scale)
         routes.append(_inspect("info.about", about.window))

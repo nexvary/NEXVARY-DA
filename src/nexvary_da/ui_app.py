@@ -11,9 +11,11 @@ from .modes import WorkMode
 from .permissions import Permission
 from .project import ProjectRuntime
 from .ui_easy_mode import EasyModePanel
+from .ui_ai_video import open_ai_video_manager
 from .ui_info import open_about_window, open_system_overview_window
 from .ui_integration_center import open_integration_center
 from .ui_project_dialog import open_add_project_dialog
+from .ui_product_ad import open_product_ad
 from .ui_toolbox import open_toolbox
 from .ui_video_studio import open_video_studio
 from .ui_terminal import TerminalPanel
@@ -21,7 +23,7 @@ from .ui_theme import PALETTE, scale_for_screen, section_color, status_color
 
 
 class DeveloperAgentUI:
-    def __init__(self, window, root: str | Path):
+    def __init__(self, window, root: str | Path, *, ui_scale: float | None = None):
         import tkinter as tk
         self.tk, self.window = tk, window
         self.runtime = ProjectRuntime(root)
@@ -29,8 +31,16 @@ class DeveloperAgentUI:
             self.runtime.close()
             raise PermissionError("Desktop UI terminal requires explicit shell permission")
         self.tracker = ProjectChangeTracker(self.runtime.root)
+        self._closing = False
+        self._poll_inflight = False
+        self._embedded_page = None
+        self._current_page = "home"
         self.terminal = self.runtime.terminal_for("ui")
-        self.scale = scale_for_screen(window.winfo_screenwidth(), window.winfo_screenheight())
+        self.scale = (
+            max(0.75, min(1.5, float(ui_scale)))
+            if ui_scale is not None
+            else scale_for_screen(window.winfo_screenwidth(), window.winfo_screenheight())
+        )
         self.font = "Segoe UI" if window.tk.call("tk", "windowingsystem") == "win32" else "TkDefaultFont"
         self.mono = "Cascadia Mono" if window.tk.call("tk", "windowingsystem") == "win32" else "TkFixedFont"
         self.repo = self.runtime.config.repository or "local-only"
@@ -46,11 +56,25 @@ class DeveloperAgentUI:
 
     def _setup_window(self) -> None:
         w, h = self.window.winfo_screenwidth(), self.window.winfo_screenheight()
-        width, height = min(max(1180, int(w * .88)), 1720), min(max(760, int(h * .86)), 1040)
+        usable_w = max(900, w - 80)
+        usable_h = max(620, h - 100)
+        min_width = min(1024, usable_w)
+        min_height = min(700, usable_h)
+        width = min(max(min_width, int(w * .88)), min(1720, usable_w))
+        height = min(max(min_height, int(h * .82)), min(1040, usable_h))
         saved = self.runtime.state.get_meta("ui.geometry")
+        geometry = f"{width}x{height}"
+        if isinstance(saved, str):
+            try:
+                size = saved.split("+", 1)[0]
+                saved_w, saved_h = (int(value) for value in size.split("x", 1))
+                if min_width <= saved_w <= usable_w and min_height <= saved_h <= usable_h:
+                    geometry = saved
+            except (TypeError, ValueError):
+                pass
         self.window.title(f"NEXVARY Developer Agent — {self.runtime.config.name}")
-        self.window.geometry(saved if isinstance(saved, str) else f"{width}x{height}")
-        self.window.minsize(1024, 700)
+        self.window.geometry(geometry)
+        self.window.minsize(min_width, min_height)
         self.window.configure(bg=PALETTE.background)
 
     def label(self, parent, text: str, *, size=9, fg=None, bold=False, bg=None):
@@ -129,15 +153,25 @@ class DeveloperAgentUI:
         info_nav = tk.Frame(self.window, bg=PALETTE.surface,
                             highlightbackground=PALETTE.silver, highlightthickness=1)
         info_nav.pack(fill="x")
-        self.label(info_nav, "NEXVARY INFO", size=7, fg=PALETTE.muted, bold=True).pack(
+        self.label(info_nav, "MENU / القائمة", size=7, fg=PALETTE.muted, bold=True).pack(
             side="left", padx=(self.px(14), self.px(8)), pady=self.px(5)
         )
-        self.button(info_nav, "ABOUT / عنا", self.open_about).pack(
-            side="left", padx=self.px(3), pady=self.px(4)
-        )
-        self.button(info_nav, "SYSTEM / حول النظام", self.open_system_overview).pack(
-            side="left", padx=self.px(3), pady=self.px(4)
-        )
+        for label, page, accent in (
+            ("HOME", "home", True),
+            ("PRODUCT AD", "product_ad", True),
+            ("AI MODELS", "ai_models", False),
+            ("VIDEO", "video", False),
+            ("TOOLS", "toolbox", False),
+            ("SETUP", "integrations", False),
+            ("ABOUT / عنا", "about", False),
+            ("SYSTEM / حول النظام", "system", False),
+        ):
+            self.button(
+                info_nav,
+                label,
+                lambda target=page: self.show_page(target),
+                accent=accent,
+            ).pack(side="left", padx=self.px(2), pady=self.px(4))
 
         self.easy_body = self.card(self.window)
         self.easy_panel = EasyModePanel(self.easy_body, self)
@@ -158,6 +192,13 @@ class DeveloperAgentUI:
         self.window.bind("<Control-k>", lambda _e: self.clear_log())
 
     def show_experience(self, mode: str) -> None:
+        if self._embedded_page is not None:
+            try:
+                self._embedded_page.destroy()
+            except Exception:
+                pass
+            self._embedded_page = None
+        self._current_page = "home"
         selected = "advanced" if mode == "advanced" else "easy"
         self.experience.set(selected)
         self.easy_body.pack_forget()
@@ -168,36 +209,91 @@ class DeveloperAgentUI:
         else:
             self.advanced_body.pack(fill="both", expand=True)
 
+    def _embedded_back(self):
+        self.show_experience(self.experience.get())
+
+    def show_page(self, page: str):
+        target = str(page or "home").strip().lower()
+        if target == "home":
+            self.show_experience(self.experience.get())
+            return None
+
+        self.easy_body.pack_forget()
+        self.advanced_body.pack_forget()
+        if self._embedded_page is not None:
+            try:
+                self._embedded_page.destroy()
+            except Exception:
+                pass
+        self._embedded_page = self.tk.Frame(self.window, bg=PALETTE.background)
+        self._embedded_page.pack(fill="both", expand=True)
+        self._current_page = target
+
+        common = {
+            "font_family": self.font,
+            "scale": self.scale,
+            "embedded": True,
+            "on_back": self._embedded_back,
+        }
+        if target == "product_ad":
+            return open_product_ad(
+                self._embedded_page,
+                self.runtime,
+                **common,
+            )
+        if target == "ai_models":
+            return open_ai_video_manager(
+                self._embedded_page,
+                self.runtime,
+                **common,
+            )
+        if target == "video":
+            return open_video_studio(
+                self._embedded_page,
+                self.runtime,
+                navigate=self.show_page,
+                **common,
+            )
+        if target == "integrations":
+            return open_integration_center(
+                self._embedded_page,
+                self.runtime,
+                on_change=self.refresh_all_integrations,
+                **common,
+            )
+        if target == "toolbox":
+            return open_toolbox(
+                self._embedded_page,
+                self.runtime,
+                **common,
+            )
+        if target == "about":
+            return open_about_window(
+                self._embedded_page,
+                **common,
+            )
+        if target == "system":
+            return open_system_overview_window(
+                self._embedded_page,
+                **common,
+            )
+        self.show_experience(self.experience.get())
+        return None
+
     def open_about(self):
-        return open_about_window(self.window, font_family=self.font, scale=self.scale)
+        return self.show_page("about")
 
     def open_system_overview(self):
-        return open_system_overview_window(self.window, font_family=self.font, scale=self.scale)
+        return self.show_page("system")
 
     def open_integrations(self) -> None:
-        open_integration_center(
-            self.window,
-            self.runtime,
-            font_family=self.font,
-            scale=self.scale,
-            on_change=self.refresh_all_integrations,
-        )
+        self.show_page("integrations")
 
     def open_toolbox(self) -> None:
-        open_toolbox(
-            self.window,
-            self.runtime,
-            font_family=self.font,
-            scale=self.scale,
-        )
+        self.show_page("toolbox")
 
     def open_video_studio(self):
-        return open_video_studio(
-            self.window,
-            self.runtime,
-            font_family=self.font,
-            scale=self.scale,
-        )
+        return self.show_page("video")
 
     def run_release_check(self) -> None:
         self.mode.set(WorkMode.RELEASE.value)
@@ -253,12 +349,8 @@ class DeveloperAgentUI:
                     self.append(f"[EASY TASK] {goal.strip()} • {summary}")
                 self.window.after(0, done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: self.easy_panel.set_message(
-                        f"Could not create the plan: {type(exc).__name__}: {exc}"
-                    ),
-                )
+                message = f"Could not create the plan: {type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                self.window.after(0, lambda value=message: self.easy_panel.set_message(value))
         threading.Thread(target=worker, daemon=True).start()
 
     def _build_projects(self, parent) -> None:
@@ -386,15 +478,14 @@ class DeveloperAgentUI:
                         self.easy_panel.refresh()
                 self.window.after(0,done)
             except Exception as exc:
-                self.window.after(
-                    0,
-                    lambda: (
-                        self.append(f"VERIFICATION ERROR • {type(exc).__name__}: {exc}"),
-                        self.set_status("ready","READY NO","BLOCKED"),
-                        self.run_button.configure(state="normal"),
-                        self.easy_panel.set_message(f"Check failed: {type(exc).__name__}: {exc}") if hasattr(self, "easy_panel") else None,
-                    ),
-                )
+                message = f"{type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                def failed(value=message):
+                    self.append(f"VERIFICATION ERROR • {value}")
+                    self.set_status("ready","READY NO","BLOCKED")
+                    self.run_button.configure(state="normal")
+                    if hasattr(self, "easy_panel"):
+                        self.easy_panel.set_message(f"Check failed: {value}")
+                self.window.after(0, failed)
         threading.Thread(target=worker,daemon=True).start()
 
     def plan_task(self)->None:
@@ -430,8 +521,9 @@ class DeveloperAgentUI:
                             self.zcode_status_label.configure(fg=PALETTE.danger)
                 self.window.after(0, done)
             except Exception as exc:
-                def failed():
-                    self.append(f"ENGINE PLAN ERROR • {type(exc).__name__}: {exc}")
+                message = f"{type(exc).__name__}: {str(exc).strip() or '<no exception message>'}"
+                def failed(value=message):
+                    self.append(f"ENGINE PLAN ERROR • {value}")
                     if engine in {AgentEngine.ZCODE, AgentEngine.HYBRID}:
                         self.zcode_status_var.set("ZCODE BLOCKED")
                         self.zcode_status_label.configure(fg=PALETTE.danger)
@@ -447,15 +539,49 @@ class DeveloperAgentUI:
         return open_add_project_dialog(self.window,runtime=self.runtime,font_family=self.font,scale=self.scale,append=self.append,on_imported=imported)
 
     def _poll_changes(self)->None:
-        try:
-            delta=self.tracker.poll(); changed=list(delta.changed) if delta.changed else self.runtime.git.changed_files(); n=len(changed)
-            self.summary["changes"].set(str(n)); self.set_status("files","FILES CLEAN" if not n else f"FILES {n}","PASS" if not n else "RUNNING")
-            if hasattr(self, "easy_panel"):
-                self.easy_panel.project_var.set("Ready" if not n else f"{n} changed file(s)")
-            if delta.changed: self.runtime.state.record_event("workspace.files.changed",{"count":n,"paths":changed[:100]})
-        except Exception:
-            pass
-        self.window.after(3000,self._poll_changes)
+        if self._closing or self._poll_inflight:
+            return
+        self._poll_inflight = True
+
+        def worker():
+            changed: list[str] = []
+            delta_changed: list[str] = []
+            try:
+                delta = self.tracker.poll()
+                delta_changed = list(delta.changed)
+                changed = delta_changed
+                if not changed and self.runtime.git.is_repository():
+                    changed = self.runtime.git.changed_files()
+                if delta_changed:
+                    self.runtime.state.record_event(
+                        "workspace.files.changed",
+                        {"count": len(changed), "paths": changed[:100]},
+                    )
+            except Exception:
+                changed = []
+
+            def apply():
+                self._poll_inflight = False
+                if self._closing:
+                    return
+                n = len(changed)
+                self.summary["changes"].set(str(n))
+                self.set_status(
+                    "files",
+                    "FILES CLEAN" if not n else f"FILES {n}",
+                    "PASS" if not n else "RUNNING",
+                )
+                if hasattr(self, "easy_panel"):
+                    self.easy_panel.project_var.set("Ready" if not n else f"{n} changed file(s)")
+                self.window.after(3000, self._poll_changes)
+
+            if not self._closing:
+                try:
+                    self.window.after(0, apply)
+                except Exception:
+                    self._poll_inflight = False
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _restore(self)->None:
         self.append(f"NEXVARY-DA • {self.runtime.config.name}"); self.append(f"SOURCE • {self.repo} • {self.branch} • {self.commit}"); self.append("SHORTCUTS • F5/Ctrl+Enter verify • Ctrl+L terminal • Ctrl+K clear")
@@ -463,6 +589,15 @@ class DeveloperAgentUI:
         if isinstance(last,dict) and last.get("complete"): self.set_status("ready","READY YES","READY")
 
     def close(self)->None:
+        if self._closing:
+            return
+        self._closing = True
+        if self._embedded_page is not None:
+            try:
+                self._embedded_page.destroy()
+            except Exception:
+                pass
+            self._embedded_page = None
         self.runtime.state.set_meta("ui.geometry",self.window.geometry())
         self.runtime.state.set_meta("ui.mode",self.mode.get())
         self.runtime.state.set_meta("ui.engine",self.engine.get())

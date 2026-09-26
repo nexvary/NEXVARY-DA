@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Mapping, Sequence
 
 from .permissions import Permission, WorkspaceGuard
+from .subprocess_policy import hidden_window_kwargs
 
 
 @dataclass(slots=True)
@@ -52,6 +53,7 @@ class ProcessRunner:
             timeout=timeout,
             shell=False,
             check=False,
+            **hidden_window_kwargs(),
         )
         return ProcessResult(
             args=list(args),
@@ -81,6 +83,7 @@ class ProcessRunner:
             timeout=timeout,
             shell=False,
             check=False,
+            **hidden_window_kwargs(),
         )
         output = completed.stdout
         if completed.returncode != 0 and completed.stderr:

@@ -8,6 +8,8 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .subprocess_policy import hidden_window_kwargs
+
 
 @dataclass(slots=True)
 class ToolInfo:
@@ -40,6 +42,7 @@ def _version(path: str, args: list[str]) -> str | None:
             errors="replace",
             timeout=5,
             check=False,
+            **hidden_window_kwargs(),
         ).stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         return None

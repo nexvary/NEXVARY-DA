@@ -7,7 +7,7 @@ GitHub is the source of truth for source history. Runtime state remains under ea
 - Repository: `nexvary/NEXVARY-DA`
 - Development branch: `dev/v0.1-core`
 - Product: NEXVARY Developer Agent
-- Current milestone candidate: Stage 550
+- Current milestone candidate: Stage 600
 
 ## Verified baseline before Stage 300
 
@@ -133,3 +133,21 @@ Stage 500 is accepted only after the exact branch head passes Windows and Ubuntu
 - Pillow is now a core dependency because portrait product-frame composition is a production feature.
 
 Stage 550 is accepted only after the exact branch head passes Windows and Ubuntu CI, runtime UI probe, Navigation Integrity Probe, source/secret/dependency audits, and native packaging/install smoke tests.
+
+
+## Stage 551-600 Product Evidence + Scene Director candidate
+
+- Product Advertisement Mode accepts seller-provided real product/demo video in addition to product photos.
+- Real video has an explicit role: camera sample, product operation, installation test, or other real product footage.
+- Scene Director deterministically selects representative clip windows without pretending to perform semantic visual analysis.
+- Selected clips are normalized to portrait 1080x1920 and receive a clear real-evidence badge such as "تصوير فعلي من الكاميرا / REAL CAMERA SAMPLE".
+- Original clip audio can be ducked, muted, or retained; duck is the default when Arabic narration is present.
+- Exact product/model research uses DDGS discovery plus Trafilatura extraction and retains source provenance.
+- Specifications enter narration only when corroborated across sources or supported by a source that the research layer identifies as likely official.
+- Manual-style setup instructions are extracted conservatively into verified setup steps.
+- Verified setup steps can be rendered as an original portrait operation explainer with numbered motion-graphic cards; third-party instructional footage is not blindly copied.
+- Arabic Product Ad narration identifies genuine seller footage explicitly and can narrate verified setup steps.
+- Product Ad subtitles remain enabled.
+- imageio-ffmpeg is bundled into the native executable; native smoke testing checks that the Scene Director FFmpeg runtime is actually present after PyInstaller packaging.
+
+Stage 600 is accepted only after the exact branch head passes Windows and Ubuntu CI, including unit/integration tests, runtime UI and navigation probes, security/dependency checks, native executable smoke with Scene Director FFmpeg verification, Windows installer smoke, and Debian package smoke.
