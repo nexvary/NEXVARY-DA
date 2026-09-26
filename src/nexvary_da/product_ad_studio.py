@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .adaptive_video import AdaptiveVideoRouter
 from .codecraft import extract_purchase_fields
 from .product_ad import ProductAdBrief, ProductAdScript, build_arabic_product_script
 from .product_scene import RealVideoAudioPolicy, RealVideoRole
@@ -497,8 +498,12 @@ class ProductAdStudioService:
                 }
             )
 
+        adaptive_plan = AdaptiveVideoRouter().plan(
+            max(15, int(round(sum(scene.duration_seconds for scene in scenes))))
+        )
         manifest = {
-            "schema": "nexvary.product-ad.render-manifest.v1",
+            "schema": "nexvary.product-ad.render-manifest.v2",
+            "adaptive_video": adaptive_plan.to_dict(),
             "studio_stage": AUTO_STUDIO_STAGE,
             "preview": bool(preview),
             "engine": result["engine"],
@@ -519,6 +524,7 @@ class ProductAdStudioService:
         )
         result["manifest"] = str(manifest_path)
         result["output_sha256"] = manifest["output_sha256"]
+        result["adaptive_video"] = adaptive_plan.to_dict()
         return result
 
     def autosave(
