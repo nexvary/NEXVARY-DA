@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .adaptive_memory import AdaptiveMemory
 from .adaptive_video import AdaptiveVideoRouter
 from .codecraft import extract_purchase_fields
 from .product_ad import ProductAdBrief, ProductAdScript, build_arabic_product_script
@@ -525,6 +526,23 @@ class ProductAdStudioService:
         result["manifest"] = str(manifest_path)
         result["output_sha256"] = manifest["output_sha256"]
         result["adaptive_video"] = adaptive_plan.to_dict()
+        try:
+            AdaptiveMemory(self.runtime.root).retain(
+                "product-ad-render",
+                f"Product Ad render completed via {render_mode}; tier={adaptive_plan.budget.tier}",
+                {
+                    "render_mode": render_mode,
+                    "hardware_tier": adaptive_plan.budget.tier,
+                    "backend_order": list(adaptive_plan.budget.backend_order),
+                    "ai_seconds_budget": adaptive_plan.budget.ai_seconds,
+                    "render_errors": render_errors[-3:],
+                    "preview": bool(preview),
+                    "storyboard_scenes": len(scenes),
+                },
+            )
+        except Exception:
+            # Memory is observational and must never turn a successful render into a failure.
+            pass
         return result
 
     def autosave(
