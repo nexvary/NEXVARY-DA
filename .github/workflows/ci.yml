@@ -45,6 +45,10 @@ jobs:
       - name: Scene Director media smoke
         run: python tests/scene_director_render_smoke.py
 
+      - name: Install FFmpeg for public media acceptance
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+
       - name: Public media quality acceptance
         if: runner.os == 'Linux'
         run: python tests/public_media_quality_smoke.py
