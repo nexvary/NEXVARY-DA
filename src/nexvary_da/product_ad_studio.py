@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .adaptive_memory import AdaptiveMemory
+from .ai_super_resolution import RealESRGANVideoEnhancer
 from .adaptive_video import AdaptiveVideoRouter
 from .codecraft import extract_purchase_fields
 from .product_ad import ProductAdBrief, ProductAdScript, build_arabic_product_script
@@ -485,6 +486,16 @@ class ProductAdStudioService:
             result["original_output"] = result["output"]
             result["output"] = quality.output
         result["quality_enhancement"] = quality.to_dict()
+        super_resolution = RealESRGANVideoEnhancer().enhance(
+            Path(str(result["output"])), scale=2
+        ) if not preview else None
+        if super_resolution is not None:
+            result["ai_super_resolution"] = super_resolution.to_dict()
+            if super_resolution.enhanced:
+                result["pre_ai_upscale_output"] = result["output"]
+                result["output"] = super_resolution.output
+        else:
+            result["ai_super_resolution"] = {"enhanced": False, "engine": "disabled-preview"}
         result.update(
             {
                 "engine": "nexvary-direct-storyboard",
