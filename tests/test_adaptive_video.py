@@ -8,7 +8,17 @@ from nexvary_da.hardware_profile import HardwareProfile
 
 
 def hw(vram: float, cuda: bool = True) -> HardwareProfile:
-    return HardwareProfile("cpu", 16.0, "gpu", vram, cuda, True, "")
+    if not cuda or vram < 4:
+        tier = "DIRECT"
+    elif vram < 6:
+        tier = "ECO"
+    elif vram < 12:
+        tier = "HYBRID"
+    elif vram < 24:
+        tier = "LOCAL_AI"
+    else:
+        tier = "MAX"
+    return HardwareProfile("cpu", 16.0, "gpu", vram, cuda, True, tier)
 
 
 class AdaptiveVideoTests(unittest.TestCase):
